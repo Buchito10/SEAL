@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Next.js / React build output
+.next/
+**/.next/
+out/
+
+# Node build output
+dist/
+build/
+coverage/
+
+# Environment variables and local secrets
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!.env.local.example
+
+# Firebase/admin credentials and other private keys
+Back/secrets/
+**/secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+*firebase-admin*.json
+
+# Local generated files and uploads
+Back/.local-storage/
+**/.local-storage/
+uploads/
+tmp/
+temp/
+
+# Logs and debug files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
