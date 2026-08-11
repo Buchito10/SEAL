@@ -11,6 +11,11 @@ out/
 dist/
 build/
 coverage/
+playwright-report/
+test-results/
+.lighthouseci/
+qa/reports/
+.release/
 
 # Environment variables and local secrets
 .env
@@ -30,6 +35,11 @@ Back/secrets/
 *service-account*.json
 *firebase-admin*.json
 
+# Certificados y desafios ACME generados en el servidor
+certbot/
+deploy/certs/
+deploy/vm/activity.env
+
 # Local generated files and uploads
 Back/.local-storage/
 **/.local-storage/
@@ -44,8 +54,16 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Python and document-rendering scratch files
+__pycache__/
+*.py[cod]
+.codex-docs/
+docs/render_*/
+
 # OS/editor files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+backups/
+.env.domain-backup-*

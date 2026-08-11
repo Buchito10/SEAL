@@ -6,11 +6,11 @@ const {
     confirmPasswordReset,
 } = require("../controllers/passwordReset.controller");
 
-// Público: valida que el correo exista y solicita enlace temporal.
+// Público: solicita un enlace sin revelar si la cuenta existe.
 router.post("/password/request", requestPasswordReset);
 
 // PÚBLICO: verificar token
-router.get("/password/verify", verifyResetToken);
+router.post("/password/verify", verifyResetToken);
 
 // PÚBLICO: confirmar nueva contraseña
 router.post("/password/confirm", confirmPasswordReset);

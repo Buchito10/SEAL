@@ -3,6 +3,19 @@ const { loginSchema, changePasswordSchema } = require("../validators/auth.schema
 const usersService = require("../services/users.service");
 const { verifyPassword, hashPassword } = require("../utils/password");
 const { signToken } = require("../utils/token");
+const { setSessionCookie, clearSessionCookie } = require("../utils/sessionCookie");
+
+function publicUser(user) {
+    return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        must_change_password: Boolean(user.must_change_password),
+        status: user.status,
+        profile_completed: Boolean(user.profile_completed),
+    };
+}
 
 async function login(req, res) {
     const parsed = loginSchema.safeParse(req.body);
@@ -10,33 +23,33 @@ async function login(req, res) {
 
     const { email, password } = parsed.data;
     const user = await usersService.getByEmail(email);
-    if (!user) return fail(res, "Invalid credentials", 401);
+    if (!user) return fail(res, "Credenciales inválidas", 401);
 
-    if (user.status !== "ACTIVE") return fail(res, "User disabled", 403);
+    if (user.status !== "ACTIVE") return fail(res, "Usuario deshabilitado", 403);
 
     const match = await verifyPassword(password, user.password_hash);
-    if (!match) return fail(res, "Invalid credentials", 401);
+    if (!match) return fail(res, "Credenciales inválidas", 401);
 
     await usersService.patch(user.id, { last_login_at: new Date().toISOString() });
 
     const token = signToken({ userId: user.id, role: user.role });
-
-    const profile_completed = Boolean(user.profile_completed);
+    setSessionCookie(res, token);
 
     return ok(res, {
-        token,
-        user: {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            must_change_password: user.must_change_password,
-            status: user.status,
-
-            profile_completed,
-        },
-        needs_profile_completion: !profile_completed,
+        user: publicUser(user),
+        needs_profile_completion: !Boolean(user.profile_completed),
     });
+}
+
+async function session(req, res) {
+    const user = await usersService.getById(req.user.userId);
+    if (!user) return fail(res, "Sesión no encontrada", 401);
+    return ok(res, { user: publicUser(user) });
+}
+
+async function logout(req, res) {
+    clearSessionCookie(res);
+    return ok(res, { logged_out: true });
 }
 
 async function changePassword(req, res) {
@@ -48,11 +61,11 @@ async function changePassword(req, res) {
     const userId = req.user.userId;
 
     const user = await usersService.getById(userId);
-    if (!user) return fail(res, "User not found", 404);
-    if (user.status !== "ACTIVE") return fail(res, "User disabled", 403);
+    if (!user) return fail(res, "Usuario no encontrado", 404);
+    if (user.status !== "ACTIVE") return fail(res, "Usuario deshabilitado", 403);
 
     const match = await verifyPassword(currentPassword, user.password_hash);
-    if (!match) return fail(res, "Current password incorrect", 401);
+    if (!match) return fail(res, "La contraseña actual es incorrecta", 401);
 
     const newHash = await hashPassword(newPassword);
 
@@ -61,7 +74,7 @@ async function changePassword(req, res) {
         must_change_password: false,
     });
 
-    return ok(res, { changed: true });
+    return ok(res, { changed: true, user: publicUser({ ...user, must_change_password: false }) });
 }
 
-module.exports = { login, changePassword };
+module.exports = { login, session, logout, changePassword };

@@ -441,8 +441,14 @@ async function getDraft(req, res) {
 
     const d = await contractDraftsService.getDraft(contractId, draftId);
     if (!d) return fail(res, "Draft not found", 404);
+    if (d.data.created_by !== req.user.userId) return fail(res, "Forbidden", 403);
 
     return ok(res, { draft_id: d.id, draft: d.data });
+}
+
+async function listDrafts(req, res) {
+    const drafts = await contractDraftsService.listDrafts(req.params.id, req.user.userId);
+    return ok(res, drafts);
 }
 
 async function publishDraft(req, res) {
@@ -457,6 +463,7 @@ async function publishDraft(req, res) {
 
     const d = await contractDraftsService.getDraft(contractId, draftId);
     if (!d) return fail(res, "Draft not found", 404);
+    if (d.data.created_by !== adminId) return fail(res, "Forbidden", 403);
 
     const commit = String(parsed.data.commit || "").trim();
     if (commit.length < 5) return fail(res, "Commit required to publish draft", 400);
@@ -601,6 +608,7 @@ module.exports = {
     createNewVersion,
 
     saveDraft,
+    listDrafts,
     getDraft,
     publishDraft,
 

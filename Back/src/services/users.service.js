@@ -42,4 +42,8 @@ async function patch(id, updates) {
     return getById(id);
 }
 
-module.exports = { getByEmail, getById, list, create, patch };
+async function deleteById(id) {
+    await col().doc(id).delete();
+}
+
+module.exports = { getByEmail, getById, list, create, patch, deleteById };

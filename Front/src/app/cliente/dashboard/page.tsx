@@ -7,8 +7,10 @@ import {
   getClientAssignmentPdf,
   getClientAssignmentSignature,
   getClientProfile,
+  getCurrentSession,
   listClientAssignmentMessages,
   listClientAssignments,
+  logoutSession,
   markClientAssignmentViewed,
   sendClientAssignmentMessage,
   signClientAssignment,
@@ -19,7 +21,7 @@ import {
   type ClientProfileInput,
   type SignatureTokenLink,
 } from "@/lib/api";
-import { getToken, getUser, logout, updateSessionUser, type SessionUser } from "@/lib/auth";
+import { logout, saveSession, updateSessionUser, type SessionUser } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -248,23 +250,22 @@ export default function ClienteDashboardPage() {
   }, [loadDetail]);
 
   useEffect(() => {
-    const token = getToken();
-    const sessionUser = getUser();
-
-    if (!token || !sessionUser) {
-      router.replace("/login");
-      return;
-    }
-
-    setSessionUser(sessionUser);
-
-    if (sessionUser.role !== "CLIENT") {
-      router.replace("/");
-      return;
-    }
-
-    void loadAssignments();
-    void loadProfile();
+    void getCurrentSession()
+      .then(({ user }) => {
+        saveSession(user);
+        setSessionUser(user);
+        if (user.must_change_password) {
+          router.replace("/cambiar-password");
+          return;
+        }
+        if (user.role !== "CLIENT") {
+          router.replace("/");
+          return;
+        }
+        void loadAssignments();
+        void loadProfile();
+      })
+      .catch(() => router.replace("/login"));
   }, [loadAssignments, loadProfile, router]);
 
   useEffect(() => {
@@ -286,9 +287,13 @@ export default function ClienteDashboardPage() {
     return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(signatureLink.link)}`;
   }, [signatureLink]);
 
-  function handleLogout() {
-    logout();
-    router.replace("/login");
+  async function handleLogout() {
+    try {
+      await logoutSession();
+    } finally {
+      logout();
+      router.replace("/login");
+    }
   }
 
   function openProfileModal() {

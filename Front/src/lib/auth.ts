@@ -12,15 +12,22 @@ export type SessionUser = {
 
 const TOKEN_KEY = "seal_token";
 const USER_KEY = "seal_user";
+const SESSION_EVENT = "seal:session-change";
 
 function canUseStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
-export function saveSession(token: string, user: SessionUser) {
+function notifySessionChange() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(SESSION_EVENT));
+}
+
+export function saveSession(user: SessionUser) {
   if (!canUseStorage()) return;
-  localStorage.setItem(TOKEN_KEY, token);
+  // El JWT vive únicamente en una cookie HttpOnly; eliminamos tokens heredados.
+  localStorage.removeItem(TOKEN_KEY);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  notifySessionChange();
 }
 
 export function updateSessionUser(user: Partial<SessionUser>) {
@@ -28,11 +35,12 @@ export function updateSessionUser(user: Partial<SessionUser>) {
   const current = getUser();
   if (!current) return;
   localStorage.setItem(USER_KEY, JSON.stringify({ ...current, ...user }));
+  notifySessionChange();
 }
 
+/** @deprecated La sesión ya no expone el JWT a JavaScript. */
 export function getToken() {
-  if (!canUseStorage()) return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return null;
 }
 
 export function getUser() {
@@ -49,11 +57,22 @@ export function getUser() {
 }
 
 export function hasSession() {
-  return Boolean(getToken() && getUser());
+  return Boolean(getUser());
 }
 
 export function logout() {
   if (!canUseStorage()) return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  notifySessionChange();
+}
+
+export function subscribeSession(callback: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("storage", callback);
+  window.addEventListener(SESSION_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(SESSION_EVENT, callback);
+  };
 }

@@ -1,41 +1,10 @@
 "use client";
 
 import Sidebar from "@/components/Sidebar";
-import type { SessionUser } from "@/lib/auth";
+import { getCurrentSession } from "@/lib/api";
+import { getUser, saveSession, subscribeSession, type SessionUser } from "@/lib/auth";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useSyncExternalStore } from "react";
-
-const TOKEN_KEY = "seal_token";
-const USER_KEY = "seal_user";
-
-function subscribeSession(callback: () => void) {
-  if (typeof window === "undefined") return () => {};
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
-
-function getSessionSnapshot() {
-  if (typeof window === "undefined") return "";
-  return `${window.localStorage.getItem(TOKEN_KEY) || ""}\n${window.localStorage.getItem(USER_KEY) || ""}`;
-}
-
-function getServerSessionSnapshot() {
-  return "";
-}
-
-function parseSession(snapshot: string) {
-  const [token, rawUser = ""] = snapshot.split("\n");
-
-  if (!token || !rawUser) {
-    return { token: null, user: null };
-  }
-
-  try {
-    return { token, user: JSON.parse(rawUser) as SessionUser };
-  } catch {
-    return { token: null, user: null };
-  }
-}
+import { useEffect, useState } from "react";
 
 export default function DashboardLayout({
   children,
@@ -43,25 +12,24 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const sessionSnapshot = useSyncExternalStore(
-    subscribeSession,
-    getSessionSnapshot,
-    getServerSessionSnapshot
-  );
-  const session = useMemo(() => parseSession(sessionSnapshot), [sessionSnapshot]);
+  const [user, setUser] = useState<SessionUser | null>(() => getUser());
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (!session.token || !session.user) {
-      router.replace("/login");
-      return;
-    }
+    const unsubscribe = subscribeSession(() => setUser(getUser()));
+    void getCurrentSession()
+      .then(({ user: currentUser }) => {
+        saveSession(currentUser);
+        setUser(currentUser);
+        if (currentUser.must_change_password) router.replace("/cambiar-password");
+        else if (currentUser.role !== "ADMIN") router.replace("/cliente/dashboard");
+      })
+      .catch(() => router.replace("/login"))
+      .finally(() => setChecking(false));
+    return unsubscribe;
+  }, [router]);
 
-    if (session.user.role !== "ADMIN") {
-      router.replace("/cliente/dashboard");
-    }
-  }, [router, session]);
-
-  if (!session.token || !session.user || session.user.role !== "ADMIN") return null;
+  if (checking || !user || user.must_change_password || user.role !== "ADMIN") return null;
 
   return (
     <div className="app">

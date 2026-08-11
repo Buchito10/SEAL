@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   createUser,
+  deleteUser,
   disableUser,
   listUsers,
   patchUser,
-  requestPasswordReset,
+  resendInvitation,
   type AdminUser,
 } from "@/lib/api";
 
@@ -60,8 +61,8 @@ function splitName(name: string) {
 
 function getClientStatus(user: AdminUser): ClientStatus {
   if (user.status === "DISABLED") return "Desactivado";
-  if (user.profile_completed && !user.must_change_password) return "Activo";
-  return "Pendiente";
+  if (user.status === "PENDING_ACTIVATION") return "Pendiente";
+  return "Activo";
 }
 
 function mapClient(user: AdminUser): ClientRow {
@@ -108,7 +109,7 @@ export default function ClientesPage() {
 
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const modalTitle = modalMode === "create" ? "Registrar Nuevo Cliente" : "Editar Cliente";
+  const modalTitle = modalMode === "create" ? "Invitar nuevo cliente" : "Editar Cliente";
 
   async function loadClients() {
     setError("");
@@ -203,13 +204,17 @@ export default function ClientesPage() {
 
     try {
       if (modalMode === "create") {
-        await createUser({
+        const result = await createUser({
           name,
           email: form.email.trim(),
           role: "CLIENT",
           position: position || undefined,
         });
-        setNotice("Cliente creado. Se envió un enlace seguro para configurar su contraseña.");
+        setNotice(
+          result.invitationSent
+            ? "Cliente invitado. Se envió un enlace seguro para activar su cuenta."
+            : "Cliente creado con activación pendiente. Configura SMTP y usa Reenviar para entregar la invitación."
+        );
       } else if (editingId) {
         await patchUser(editingId, {
           name,
@@ -233,8 +238,8 @@ export default function ClientesPage() {
     setNotice("");
 
     try {
-      await requestPasswordReset(client.email);
-      setNotice(`Se envió un enlace de acceso a ${client.email}.`);
+      const result = await resendInvitation(client.id);
+      setNotice(result.message);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -261,6 +266,29 @@ export default function ClientesPage() {
     }
   }
 
+  async function onDelete(client: ClientRow) {
+    const confirmed = window.confirm(
+      `¿Eliminar permanentemente a ${client.name}?\n\n` +
+        "Se borrarán su cuenta, perfil y enlaces de acceso. El correo quedará disponible para registrarlo nuevamente. " +
+        "La evidencia contractual histórica se conservará."
+    );
+    if (!confirmed) return;
+
+    setActionId(client.id);
+    setError("");
+    setNotice("");
+
+    try {
+      const result = await deleteUser(client.id);
+      setNotice(result.message);
+      await loadClients();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setActionId(null);
+    }
+  }
+
   return (
     <div className="clients-screen">
       <header className="topbar clients-topbar">
@@ -271,7 +299,7 @@ export default function ClientesPage() {
 
         <div className="topbar__right">
           <button className="btn btn--primary" onClick={() => openModal("create")}>
-            + Nuevo cliente
+            + Invitar cliente
           </button>
         </div>
       </header>
@@ -379,14 +407,14 @@ export default function ClientesPage() {
                 <div className="muted small">{client.contractsText}</div>
 
                 <div className="clients-actions">
-                  {client.status !== "Desactivado" && (
+                  {client.user.status === "PENDING_ACTIVATION" && (
                     <button
                       className="btn btn--ghost btn--sm"
-                      title="Reenviar enlace de acceso"
+                      title="Reenviar invitación de activación"
                       disabled={actionId === client.id}
                       onClick={() => void onResend(client)}
                     >
-                      Reenviar
+                      Reenviar invitación
                     </button>
                   )}
 
@@ -409,6 +437,15 @@ export default function ClientesPage() {
                       X
                     </button>
                   )}
+
+                  <button
+                    className="btn btn--ghost btn--sm text-danger"
+                    title="Eliminar cliente permanentemente"
+                    disabled={actionId === client.id}
+                    onClick={() => void onDelete(client)}
+                  >
+                    Eliminar
+                  </button>
                 </div>
               </div>
             ))
@@ -502,7 +539,7 @@ export default function ClientesPage() {
               <label className="field checkbox-field clients-secure-note">
                 <input type="checkbox" checked={form.forcePwdChange} disabled readOnly />
                 <span className="muted small">
-                  El sistema enviará un enlace seguro y forzará configuración de contraseña.
+                  El sistema enviará una invitación segura. El cliente deberá crear su contraseña y aceptar los documentos de privacidad para activar la cuenta.
                 </span>
               </label>
 
@@ -511,7 +548,7 @@ export default function ClientesPage() {
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn--primary" disabled={saving}>
-                  {saving ? "Guardando..." : "Guardar cliente"}
+                  {saving ? "Enviando..." : modalMode === "create" ? "Crear y enviar invitación" : "Guardar cambios"}
                 </button>
               </div>
             </form>

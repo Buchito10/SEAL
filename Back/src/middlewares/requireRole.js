@@ -1,6 +1,6 @@
 function requireRole(...roles) {
     return (req, res, next) => {
-        if (!req.user?.role) {
+        if (!req.user?.role || req.user.status !== "ACTIVE") {
             return res.status(401).json({ ok: false, message: "Unauthorized" });
         }
         if (!roles.includes(req.user.role)) {

@@ -31,6 +31,7 @@ router.post("/:id/versions", controller.createNewVersion);
 
 // drafts
 router.post("/:id/drafts", controller.saveDraft);
+router.get("/:id/drafts", controller.listDrafts);
 router.get("/:id/drafts/:draftId", controller.getDraft);
 router.post("/:id/drafts/:draftId/publish", controller.publishDraft);
 

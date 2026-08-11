@@ -1,4 +1,8 @@
 const { z } = require("zod");
+const {
+    PRIVACY_NOTICE_VERSION,
+    DATA_PROTECTION_VERSION,
+} = require("../config/privacy");
 
 const loginSchema = z.object({
     email: z.string().email(),
@@ -18,6 +22,15 @@ const requestResetSchema = z.object({
 const confirmResetSchema = z.object({
     token: z.string().min(10),
     newPassword: z.string().min(8),
+    acceptsPrivacyNotice: z.boolean().optional(),
+    acceptsDataProtection: z.boolean().optional(),
+    privacyNoticeVersion: z.literal(PRIVACY_NOTICE_VERSION).optional(),
+    dataProtectionVersion: z.literal(DATA_PROTECTION_VERSION).optional(),
 });
 
-module.exports = { loginSchema, changePasswordSchema, requestResetSchema, confirmResetSchema };
+module.exports = {
+    loginSchema,
+    changePasswordSchema,
+    requestResetSchema,
+    confirmResetSchema,
+};

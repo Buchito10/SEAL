@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { logoutSession } from "@/lib/api";
 import { getUser, logout, type SessionUser } from "@/lib/auth";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -27,9 +28,13 @@ export default function Sidebar() {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  function handleLogout() {
-    logout();
-    router.replace("/login");
+  async function handleLogout() {
+    try {
+      await logoutSession();
+    } finally {
+      logout();
+      router.replace("/login");
+    }
   }
 
   return (
@@ -80,7 +85,7 @@ export default function Sidebar() {
             <div className="user__name">{user?.name || "Administrador"}</div>
             <div className="user__role">{user?.email || "Sesión activa"}</div>
           </div>
-          <button className="icon-btn" aria-label="Salir" onClick={handleLogout}>⎋</button>
+          <button className="icon-btn" aria-label="Salir" onClick={() => void handleLogout()}>⎋</button>
         </div>
       </div>
     </aside>

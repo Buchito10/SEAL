@@ -45,8 +45,15 @@ function exposeLocalhostOnLan(configuredUrl) {
 
 function buildPublicUrlWithToken(configuredUrl, token) {
     const publicUrl = exposeLocalhostOnLan(configuredUrl);
-    const separator = publicUrl.includes("?") ? "&" : "?";
-    return `${publicUrl}${separator}token=${encodeURIComponent(token)}`;
+    const encodedToken = encodeURIComponent(token);
+
+    try {
+        const url = new URL(publicUrl);
+        url.hash = `token=${encodedToken}`;
+        return url.toString();
+    } catch {
+        return `${String(publicUrl).split("#", 1)[0]}#token=${encodedToken}`;
+    }
 }
 
 module.exports = {

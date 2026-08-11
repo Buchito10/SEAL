@@ -11,7 +11,6 @@ const patchUserSchema = z.object({
     name: z.string().min(2).optional(),
     role: z.enum(["ADMIN", "CLIENT"]).optional(),
     position: z.string().nullable().optional(),
-    status: z.enum(["ACTIVE", "DISABLED"]).optional(),
 
     // Perfil extendido del cliente
     rfc: z.string().min(10).max(13).optional(),

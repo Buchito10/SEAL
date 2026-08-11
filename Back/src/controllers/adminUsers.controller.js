@@ -2,10 +2,11 @@ const { ok, fail } = require("../utils/response");
 const usersService = require("../services/users.service");
 const { createUserSchema, patchUserSchema } = require("../validators/users.schemas");
 const { hashPassword } = require("../utils/password");
-const { FRONT_RESET_URL, PASSWORD_TOKEN_EXPIRES_MIN } = require("../config/env");
+const { FRONT_ACTIVATION_URL, PASSWORD_TOKEN_EXPIRES_MIN } = require("../config/env");
 const { buildPublicUrlWithToken } = require("../utils/publicUrl");
 const passwordTokensService = require("../services/passwordTokens.service");
-const { sendPasswordResetEmail } = require("../services/email.service");
+const signatureTokensService = require("../services/signatureTokens.service");
+const { sendPasswordAccessEmail } = require("../services/email.service");
 
 // password temporal simple (en fases futuras lo mandas por correo)
 function generateTempPassword() {
@@ -21,6 +22,7 @@ async function createUser(req, res) {
     if (!parsed.success) return fail(res, "Invalid body", 400, parsed.error.flatten());
 
     const { name, email, role, position } = parsed.data;
+    const invitedAt = new Date().toISOString();
 
     const exists = await usersService.getByEmail(email);
     if (exists) return fail(res, "Email already exists", 409);
@@ -36,8 +38,12 @@ async function createUser(req, res) {
         position: position || null,
         password_hash,
         must_change_password: true,
-        status: "ACTIVE",
+        status: "PENDING_ACTIVATION",
         last_login_at: null,
+        invited_at: invitedAt,
+        invited_by_user_id: req.user.userId,
+        activated_at: null,
+        consent_record: null,
 
         // Nuevos campos (incompletos al crear)
         rfc: null,
@@ -55,15 +61,29 @@ async function createUser(req, res) {
     });
 
     // Generar token y mandar correo con link
-    const { rawToken } = await passwordTokensService.createForUser(created.id);
-    const link = buildPublicUrlWithToken(FRONT_RESET_URL, rawToken);
+    const { rawToken } = await passwordTokensService.createForUser(
+        created.id,
+        passwordTokensService.PURPOSES.ACCOUNT_ACTIVATION,
+        req.user.userId
+    );
+    const link = buildPublicUrlWithToken(FRONT_ACTIVATION_URL, rawToken);
+    const invitingAdmin = await usersService.getById(req.user.userId);
+    let invitationSent = false;
 
-    await sendPasswordResetEmail({
-        to: created.email,
-        name: created.name,
-        link,
-        expiresMinutes: PASSWORD_TOKEN_EXPIRES_MIN,
-    });
+    try {
+        const mailResult = await sendPasswordAccessEmail({
+            to: created.email,
+            name: created.name,
+            link,
+            expiresMinutes: PASSWORD_TOKEN_EXPIRES_MIN,
+            createdByName: invitingAdmin?.name,
+            loginEmail: created.email,
+            purpose: passwordTokensService.PURPOSES.ACCOUNT_ACTIVATION,
+        });
+        invitationSent = !mailResult?.skipped;
+    } catch (error) {
+        console.error("No se pudo enviar la invitación inicial:", error.message);
+    }
 
     const payload = {
         user: {
@@ -89,7 +109,7 @@ async function createUser(req, res) {
             address_zip: created.address_zip ?? null,
             address_country: created.address_country ?? "MX",
         },
-        resetLinkSent: true,
+        invitationSent,
     };
 
     return ok(res, payload, 201);
@@ -157,6 +177,10 @@ async function getUser(req, res) {
 }
 
 async function patchUser(req, res) {
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "status")) {
+        return fail(res, "El estado de la cuenta sólo puede cambiarse mediante su endpoint específico", 400);
+    }
+
     const parsed = patchUserSchema.safeParse(req.body);
     if (!parsed.success) return fail(res, "Invalid body", 400, parsed.error.flatten());
 
@@ -193,13 +217,83 @@ async function patchUser(req, res) {
     });
 }
 
+async function resendInvitation(req, res) {
+    const user = await usersService.getById(req.params.id);
+    if (!user) return fail(res, "Not found", 404);
+    if (user.status !== "PENDING_ACTIVATION" || !user.must_change_password) {
+        return fail(res, "La cuenta ya no tiene una activación pendiente", 409);
+    }
+
+    const { rawToken } = await passwordTokensService.createForUser(
+        user.id,
+        passwordTokensService.PURPOSES.ACCOUNT_ACTIVATION,
+        req.user.userId
+    );
+    const link = buildPublicUrlWithToken(FRONT_ACTIVATION_URL, rawToken);
+    const invitingAdmin = await usersService.getById(req.user.userId);
+    const mailResult = await sendPasswordAccessEmail({
+        to: user.email,
+        name: user.name,
+        link,
+        expiresMinutes: PASSWORD_TOKEN_EXPIRES_MIN,
+        createdByName: invitingAdmin?.name,
+        loginEmail: user.email,
+        purpose: passwordTokensService.PURPOSES.ACCOUNT_ACTIVATION,
+    });
+
+    return ok(res, {
+        sent: !mailResult?.skipped,
+        message: mailResult?.skipped
+            ? "La invitación se generó, pero el correo SMTP no está configurado."
+            : "La invitación fue reenviada.",
+    });
+}
+
 async function disableUser(req, res) {
     const id = req.params.id;
     const user = await usersService.getById(id);
     if (!user) return fail(res, "Not found", 404);
 
     const updated = await usersService.patch(id, { status: "DISABLED" });
+    await passwordTokensService.expireAllOpenTokensForUser(id);
     return ok(res, { id: updated.id, status: updated.status });
 }
 
-module.exports = { createUser, listUsers, getUser, patchUser, disableUser };
+async function deleteUser(req, res) {
+    const id = req.params.id;
+    const user = await usersService.getById(id);
+    if (!user) return fail(res, "Not found", 404);
+    if (id === req.user.userId) {
+        return fail(res, "No puedes eliminar tu propia cuenta", 409);
+    }
+    if (user.role !== "CLIENT") {
+        return fail(res, "Sólo se pueden eliminar cuentas de clientes desde este endpoint", 409);
+    }
+
+    // Cierra cualquier sesión o activación concurrente antes de limpiar credenciales.
+    await usersService.patch(id, { status: "DISABLED" });
+
+    const [passwordTokensDeleted, signatureTokensDeleted] = await Promise.all([
+        passwordTokensService.deleteAllForUser(id),
+        signatureTokensService.deleteAllForClient(id),
+    ]);
+    await usersService.deleteById(id);
+
+    return ok(res, {
+        id,
+        deleted: true,
+        email_released: true,
+        tokens_deleted: passwordTokensDeleted + signatureTokensDeleted,
+        message: "Cliente eliminado. El correo puede utilizarse nuevamente.",
+    });
+}
+
+module.exports = {
+    createUser,
+    listUsers,
+    getUser,
+    patchUser,
+    disableUser,
+    resendInvitation,
+    deleteUser,
+};

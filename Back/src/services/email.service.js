@@ -45,19 +45,35 @@ function getTransporter() {
     return transporter;
 }
 
-function buildResetEmailHTML({
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function buildPasswordAccessEmailHTML({
     name,
     loginEmail,
     createdByName,
     link,
     expiresMinutes,
+    purpose,
 }) {
-    const safeName = name ? String(name) : "";
-    const safeLoginEmail = loginEmail ? String(loginEmail) : "";
-    const safeCreatedBy = createdByName ? String(createdByName) : "";
+    const safeName = escapeHtml(name);
+    const safeLoginEmail = escapeHtml(loginEmail);
+    const safeCreatedBy = escapeHtml(createdByName);
+    const safeLink = escapeHtml(link);
+    const isActivation = purpose === "ACCOUNT_ACTIVATION";
 
     const title = "Seal Contratos";
-    const preheader = "Establece tu contraseña para iniciar sesión.";
+    const preheader = isActivation
+        ? "Activa la cuenta que tu administrador creó en Seal."
+        : "Restablece la contraseña de tu cuenta Seal.";
+    const heading = isActivation ? "Activa tu cuenta" : "Restablece tu contraseña";
+    const buttonLabel = isActivation ? "Activar cuenta" : "Restablecer contraseña";
 
     return `
 <!doctype html>
@@ -83,20 +99,27 @@ function buildResetEmailHTML({
         </div>
 
         <div style="padding:22px 20px 10px 20px;font-family:Arial,sans-serif;color:#111827;">
-          <h2 style="margin:0 0 10px 0;font-size:18px;line-height:1.25;">Configura tu contraseña</h2>
+          <h2 style="margin:0 0 10px 0;font-size:18px;line-height:1.25;">${heading}</h2>
 
           <p style="margin:0 0 10px 0;font-size:14px;line-height:1.55;">
             Hola ${safeName || ""}${safeName ? "," : ""}
           </p>
 
-          ${safeCreatedBy
+          ${isActivation && safeCreatedBy
             ? `
           <p style="margin:0 0 10px 0;font-size:14px;line-height:1.55;">
-            <strong>${safeCreatedBy}</strong> creó tu cuenta en <strong>Seal Contratos</strong>.
+            <strong>${safeCreatedBy}</strong> te dio acceso a <strong>Seal Contratos</strong>.
           </p>
           `
             : ""
         }
+
+          <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;">
+            ${isActivation
+              ? "Para completar la activación, crea una contraseña y acepta los documentos de protección de datos y privacidad."
+              : "Recibimos una solicitud para cambiar la contraseña de tu cuenta. Si fuiste tú, utiliza el siguiente enlace."
+            }
+          </p>
 
           <p style="margin:0 0 14px 0;font-size:14px;line-height:1.55;">
             Para iniciar sesión, tu usuario será este mismo correo:
@@ -107,9 +130,9 @@ function buildResetEmailHTML({
           </p>
 
           <div style="margin:14px 0 16px 0;">
-            <a href="${link}"
+            <a href="${safeLink}"
               style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 16px;border-radius:10px;font-weight:700;font-size:14px;">
-              Establecer contraseña
+              ${buttonLabel}
             </a>
           </div>
 
@@ -126,13 +149,13 @@ function buildResetEmailHTML({
           <p style="margin:0 0 14px 0;font-size:12px;line-height:1.55;color:#6b7280;">
             Si el botón no funciona, copia y pega este enlace en tu navegador:
             <br/>
-            <span style="word-break:break-all;">${link}</span>
+            <span style="word-break:break-all;">${safeLink}</span>
           </p>
 
           ${NODE_ENV === "development"
             ? `
           <hr style="border:none;border-top:1px solid #e5e7eb;margin:14px 0;" />
-          <p style="margin:0;font-size:12px;line-height:1.55;color:#6b7280;">(DEV) Link directo: ${link}</p>
+          <p style="margin:0;font-size:12px;line-height:1.55;color:#6b7280;">(DEV) Link directo: ${safeLink}</p>
           `
             : ""
         }
@@ -151,24 +174,29 @@ function buildResetEmailHTML({
 `;
 }
 
-async function sendPasswordResetEmail({
+async function sendPasswordAccessEmail({
     to,
     name,
     link,
     expiresMinutes,
     createdByName,
     loginEmail,
+    purpose,
 }) {
+    const isActivation = purpose === "ACCOUNT_ACTIVATION";
     const info = await sendMailOrLog({
         from: EMAIL_FROM,
         to,
-        subject: "Seal Contratos — Configura tu contraseña",
-        html: buildResetEmailHTML({
+        subject: isActivation
+            ? "Seal Contratos — Activa tu cuenta"
+            : "Seal Contratos — Restablece tu contraseña",
+        html: buildPasswordAccessEmailHTML({
             name,
             link,
             expiresMinutes,
             createdByName,
             loginEmail: loginEmail || to,
+            purpose,
         }),
     });
     return info;
@@ -265,7 +293,7 @@ async function sendApprovedNotificationEmail({ to, name }) {
 }
 
 module.exports = {
-    sendPasswordResetEmail,
+    sendPasswordAccessEmail,
     sendAssignmentNotificationEmail,
     sendProfileUpdateRequestEmail,
     sendApprovedNotificationEmail,

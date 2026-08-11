@@ -60,8 +60,23 @@ async function markUsed(docRef) {
     });
 }
 
+async function deleteAllForClient(clientId) {
+    let deleted = 0;
+
+    while (true) {
+        const snap = await col().where("client_id", "==", clientId).limit(400).get();
+        if (snap.empty) return deleted;
+
+        const batch = db().batch();
+        snap.docs.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+        deleted += snap.size;
+    }
+}
+
 module.exports = {
     createForAssignment,
     getValidByRawToken,
     markUsed,
+    deleteAllForClient,
 };

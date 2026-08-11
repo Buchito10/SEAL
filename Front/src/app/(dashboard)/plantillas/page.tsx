@@ -3,18 +3,28 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   acquireContractLock,
+  cloneContract,
+  compareContractVersions,
   createContractVersion,
   getContract,
+  getContractDraft,
   getContractVersionTemplate,
+  getPlaceholderCatalog,
   listContracts,
+  listContractDrafts,
   listContractVersions,
+  publishContractDraft,
   releaseContractLock,
   refreshContractLock,
+  saveContractDraft,
   saveContractTemplateSameVersion,
   uploadContract,
   type AdminContract,
   type ContractVersionSummary,
   type ContractVersionTemplate,
+  type ContractVersionsComparison,
+  type ContractDraftResponse,
+  type PlaceholderCatalog,
 } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import Link from "next/link";
@@ -32,7 +42,7 @@ const EMPTY_FORM = {
   area: "General",
 };
 
-const PLACEHOLDER_GROUPS = [
+const FALLBACK_PLACEHOLDER_GROUPS = [
   {
     label: "Cliente",
     items: [
@@ -42,6 +52,7 @@ const PLACEHOLDER_GROUPS = [
       ["employee.curp", "CURP"],
       ["employee.phone", "Teléfono"],
       ["employee.address_line1", "Dirección"],
+      ["employee.address_line2", "Dirección complementaria"],
       ["employee.address_city", "Ciudad"],
       ["employee.address_state", "Estado"],
       ["employee.address_zip", "C.P."],
@@ -119,6 +130,13 @@ export default function PlantillasPage() {
   const [selected, setSelected] = useState<AdminContract | null>(null);
   const [versions, setVersions] = useState<ContractVersionSummary[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
+  const [placeholderCatalog, setPlaceholderCatalog] = useState<PlaceholderCatalog | null>(null);
+  const [comparison, setComparison] = useState<ContractVersionsComparison | null>(null);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [recentDraft, setRecentDraft] = useState<ContractDraftResponse | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [cloning, setCloning] = useState(false);
 
   const [view, setView] = useState<ViewMode>("catalogo");
   const [q, setQ] = useState("");
@@ -149,8 +167,9 @@ export default function PlantillasPage() {
     setIsLoading(true);
 
     try {
-      const rows = await listContracts();
+      const [rows, catalog] = await Promise.all([listContracts(), getPlaceholderCatalog()]);
       setContracts(rows);
+      setPlaceholderCatalog(catalog);
       setSelected((current) => {
         if (current && rows.some((contract) => contract.id === current.id)) {
           return rows.find((contract) => contract.id === current.id) || current;
@@ -282,6 +301,14 @@ export default function PlantillasPage() {
     return Array.from(found).sort();
   }, [editorHtml, editorVersion?.placeholders_used, selected?.base_placeholders_used]);
 
+  const placeholderGroups = useMemo(() => {
+    if (!placeholderCatalog) return FALLBACK_PLACEHOLDER_GROUPS;
+    return [
+      { label: "Cliente", items: placeholderCatalog.employee.map((item) => [item.key, item.label]) },
+      { label: "Contrato", items: placeholderCatalog.company.map((item) => [item.key, item.label]) },
+    ];
+  }, [placeholderCatalog]);
+
   function openCreateModal() {
     setError("");
     setNotice("");
@@ -334,16 +361,22 @@ export default function PlantillasPage() {
     setEditorLoading(true);
     setEditorMode(mode);
     setCommitMessage("");
+    setRecentDraft(null);
 
     try {
       await acquireContractLock(selected.id);
       setLockOwner(true);
 
       const versionNumber = selected.current_version || 1;
-      const template = await getContractVersionTemplate(selected.id, versionNumber);
+      const [template, drafts] = await Promise.all([
+        getContractVersionTemplate(selected.id, versionNumber),
+        listContractDrafts(selected.id),
+      ]);
       setEditorVersion(template);
       setEditorHtml(template.template_html || "");
       setEditorView("visual");
+      const latestDraft = drafts[0];
+      setRecentDraft(latestDraft?.id ? { draft_id: latestDraft.id, draft: latestDraft } : null);
       setEditorOpen(true);
       await loadSelectedDetails(selected.id);
     } catch (err) {
@@ -453,6 +486,137 @@ export default function PlantillasPage() {
       setError(getErrorMessage(err));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onCloneContract() {
+    if (!selected || cloning) return;
+    const title = window.prompt("Nombre de la copia:", `${selected.title} (copia)`);
+    if (title === null) return;
+    if (title.trim().length < 3) {
+      setError("El nombre de la copia debe tener al menos 3 caracteres.");
+      return;
+    }
+
+    setCloning(true);
+    setError("");
+    setNotice("");
+    try {
+      const { contract } = await cloneContract(selected.id, {
+        title: title.trim(),
+        area: selected.area,
+        position: selected.position,
+      });
+      await loadContracts();
+      setSelected(contract);
+      setNotice(`Se creó la plantilla "${contract.title}" a partir de la versión más reciente.`);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setCloning(false);
+    }
+  }
+
+  async function openComparison() {
+    if (!selected || versions.length < 2) {
+      setError("Se necesitan al menos dos versiones para comparar.");
+      return;
+    }
+    const latest = selected.current_version || versions[versions.length - 1]?.version || 1;
+    const previous = versions.filter((item) => item.version < latest).at(-1)?.version || 1;
+
+    setComparisonLoading(true);
+    setError("");
+    try {
+      const data = await compareContractVersions(selected.id, [previous, latest]);
+      setComparison(data);
+      setComparisonOpen(true);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setComparisonLoading(false);
+    }
+  }
+
+  function currentEditorHtml() {
+    if (editorView === "visual") return visualEditorRef.current?.innerHTML || editorHtml;
+    return editorHtml;
+  }
+
+  async function onSaveDraft() {
+    if (!selected || !editorVersion || draftBusy) return;
+    const html = currentEditorHtml();
+    if (!html.trim()) {
+      setError("El borrador no puede estar vacío.");
+      return;
+    }
+
+    setDraftBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      setEditorHtml(html);
+      const saved = await saveContractDraft(selected.id, {
+        based_on_version: selected.current_version || editorVersion.version,
+        template_html: html,
+      });
+      setRecentDraft(saved);
+      setNotice(`Borrador guardado. Expira ${formatDate(saved.draft.expires_at)}.`);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
+  async function onReloadDraft() {
+    if (!selected || !recentDraft || draftBusy) return;
+    setDraftBusy(true);
+    setError("");
+    try {
+      const loaded = await getContractDraft(selected.id, recentDraft.draft_id);
+      setRecentDraft(loaded);
+      setEditorHtml(loaded.draft.template_html);
+      editorHtmlRef.current = loaded.draft.template_html;
+      if (editorView === "visual" && visualEditorRef.current) {
+        visualEditorRef.current.innerHTML = loaded.draft.template_html;
+      }
+      setNotice("Borrador recuperado en el editor.");
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
+  async function onPublishDraft() {
+    if (!selected || !recentDraft || draftBusy) return;
+    const commit = commitMessage.trim();
+    if (commit.length < 5) {
+      setError("Escribe un mensaje de cambio de al menos 5 caracteres para publicar.");
+      return;
+    }
+
+    setDraftBusy(true);
+    setError("");
+    try {
+      const current = selected.current_version || 1;
+      const mode = editorMode === "same_version" && current > 1 ? "same_version" : "new_version";
+      await publishContractDraft(selected.id, recentDraft.draft_id, { mode, commit });
+      await releaseContractLock(selected.id);
+      setLockOwner(false);
+      setRecentDraft(null);
+      setEditorOpen(false);
+      setEditorVersion(null);
+      setEditorHtml("");
+      setCommitMessage("");
+      await loadContracts();
+      await loadSelectedDetails(selected.id);
+      setNotice("Borrador publicado correctamente.");
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDraftBusy(false);
     }
   }
 
@@ -806,6 +970,22 @@ export default function PlantillasPage() {
                 >
                   Crear nueva versión
                 </button>
+                <button
+                  className="btn btn--ghost"
+                  type="button"
+                  onClick={() => void openComparison()}
+                  disabled={comparisonLoading || versions.length < 2}
+                >
+                  {comparisonLoading ? "Comparando..." : "Comparar versiones"}
+                </button>
+                <button
+                  className="btn btn--ghost"
+                  type="button"
+                  onClick={() => void onCloneContract()}
+                  disabled={cloning}
+                >
+                  {cloning ? "Duplicando..." : "Duplicar plantilla"}
+                </button>
               </div>
             </>
           )}
@@ -1026,7 +1206,7 @@ export default function PlantillasPage() {
                   <option value="" disabled>
                     Insertar campo
                   </option>
-                  {PLACEHOLDER_GROUPS.map((group) => (
+                  {placeholderGroups.map((group) => (
                     <optgroup key={group.label} label={group.label}>
                       {group.items.map(([key, label]) => (
                         <option key={key} value={key}>
@@ -1119,6 +1299,18 @@ export default function PlantillasPage() {
                       : "El historial conservará el commit con fecha y usuario."}
                   </div>
                 </div>
+
+                {recentDraft && (
+                  <div className="templates-editor__panel">
+                    <div className="note__title">Borrador reciente</div>
+                    <div className="muted small">
+                      Guardado {formatDate(recentDraft.draft.updated_at || recentDraft.draft.created_at)} · expira {formatDate(recentDraft.draft.expires_at)}
+                    </div>
+                    <button className="btn btn--ghost btn--sm" type="button" onClick={() => void onReloadDraft()} disabled={draftBusy} style={{ marginTop: 8 }}>
+                      Recuperar borrador
+                    </button>
+                  </div>
+                )}
               </aside>
             </div>
 
@@ -1126,11 +1318,49 @@ export default function PlantillasPage() {
               <button type="button" className="btn btn--ghost" onClick={() => void closeEditor()} disabled={editorSaving}>
                 Cancelar
               </button>
+              <button type="button" className="btn btn--soft" onClick={() => void onSaveDraft()} disabled={editorSaving || draftBusy || !editorHtml.trim()}>
+                {draftBusy ? "Procesando..." : "Guardar borrador"}
+              </button>
+              {recentDraft && (
+                <button type="button" className="btn btn--soft" onClick={() => void onPublishDraft()} disabled={editorSaving || draftBusy || commitMessage.trim().length < 5}>
+                  Publicar borrador
+                </button>
+              )}
               <button type="submit" className="btn btn--primary" disabled={editorSaving || !editorHtml.trim() || commitMessage.trim().length < 5}>
                 {editorSaving ? "Guardando..." : "Guardar con commit"}
               </button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <div
+        className={`modal-overlay ${comparisonOpen ? "is-visible" : ""}`}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setComparisonOpen(false);
+        }}
+      >
+        <div className="modal card" style={{ maxWidth: 1100 }} onMouseDown={(event) => event.stopPropagation()}>
+          <div className="modal__header">
+            <div>
+              <h2 className="card__title">Comparación de versiones</h2>
+              <div className="muted small">{selected?.title || "Plantilla"}</div>
+            </div>
+            <button className="icon-btn icon-btn--sm" type="button" aria-label="Cerrar comparación" onClick={() => setComparisonOpen(false)}>X</button>
+          </div>
+          <div className="modal__body">
+            <div className="grid-2" style={{ alignItems: "start" }}>
+              {(comparison?.versions || []).map((version) => (
+                <section className="note" key={version.version}>
+                  <div className="note__title">Versión {version.display_version || version.version}</div>
+                  <div className="muted small" style={{ marginBottom: 12 }}>
+                    {(version.placeholders_used || []).length} campos · {(version.commits || []).length} cambios registrados
+                  </div>
+                  <div className="document-page" dangerouslySetInnerHTML={{ __html: version.template_html }} />
+                </section>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

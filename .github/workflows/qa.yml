@@ -1,0 +1,70 @@
+name: SEAL QA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-whitebox:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            Back/package-lock.json
+            qa/package-lock.json
+      - run: npm ci
+        working-directory: Back
+      - run: npm ci
+        working-directory: qa
+      - run: npm run test:coverage
+        working-directory: Back
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Front/package-lock.json
+      - run: npm ci
+        working-directory: Front
+      - run: npm run build
+        working-directory: Front
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            Front/package-lock.json
+            qa/package-lock.json
+      - run: npm ci
+        working-directory: Front
+      - run: npm ci
+        working-directory: qa
+      - name: Iniciar Next.js
+        run: |
+          npm --prefix Front run dev -- -H 0.0.0.0 > /tmp/seal-next.log 2>&1 &
+          for i in {1..30}; do curl -fsS http://127.0.0.1:3000/login && exit 0; sleep 2; done
+          cat /tmp/seal-next.log
+          exit 1
+      - name: Ejecutar Playwright
+        run: BASE_URL=http://127.0.0.1:3000 npm --prefix qa run test:e2e
+      - name: Conservar reporte si falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: qa/reports/playwright

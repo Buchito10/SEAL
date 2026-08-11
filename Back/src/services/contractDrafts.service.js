@@ -39,6 +39,18 @@ async function getDraft(contractId, draftId) {
     return { id: doc.id, data: doc.data(), ref };
 }
 
+async function listDrafts(contractId, createdBy) {
+    const snapshot = await draftsCol(contractId)
+        .where("created_by", "==", createdBy)
+        .limit(20)
+        .get();
+    const now = Date.now();
+    return snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((draft) => !draft.expires_at || new Date(draft.expires_at).getTime() > now)
+        .sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)));
+}
+
 async function deleteDraft(contractId, draftId) {
     await draftsCol(contractId).doc(draftId).delete();
     return true;
@@ -78,6 +90,7 @@ async function cleanupExpiredDrafts() {
 module.exports = {
     createDraft,
     getDraft,
+    listDrafts,
     deleteDraft,
     cleanupExpiredDrafts,
 };

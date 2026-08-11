@@ -5,10 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   listAdminAssignments,
   listContracts,
+  getSystemStatus,
   listUsers,
   type AdminContract,
   type AdminUser,
   type AssignmentSummary,
+  type SystemStatus,
 } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 
@@ -20,6 +22,7 @@ export default function AjustesPage() {
   const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [contracts, setContracts] = useState<AdminContract[]>([]);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const user = getUser();
@@ -29,14 +32,16 @@ export default function AjustesPage() {
     setError("");
 
     try {
-      const [assignmentRows, userRows, contractRows] = await Promise.all([
+      const [assignmentRows, userRows, contractRows, status] = await Promise.all([
         listAdminAssignments(),
         listUsers(),
         listContracts(),
+        getSystemStatus(),
       ]);
       setAssignments(assignmentRows);
       setUsers(userRows);
       setContracts(contractRows);
+      setSystemStatus(status);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -53,8 +58,10 @@ export default function AjustesPage() {
       {
         title: "Autenticación",
         value: user?.email || "Sesión admin",
-        hint: "Acceso protegido por JWT y rol ADMIN.",
-        ok: true,
+        hint: systemStatus?.security.http_only_session_cookie
+          ? "Sesión protegida por cookie HttpOnly y autorización por rol ADMIN."
+          : "La sesión necesita revisión.",
+        ok: Boolean(systemStatus?.security.http_only_session_cookie),
       },
       {
         title: "Clientes",
@@ -69,16 +76,20 @@ export default function AjustesPage() {
         ok: contracts.some((item) => item.status === "ACTIVE"),
       },
       {
-        title: "Storage local",
-        value: "Habilitado en desarrollo",
-        hint: "Si no hay bucket Firebase, firmas/PDFs se guardan en Back/.local-storage.",
-        ok: true,
+        title: "Almacenamiento",
+        value: systemStatus?.storage.mode === "firebase" ? "Firebase Storage" : "Volumen local persistente",
+        hint: systemStatus?.storage.external_backup_recommended
+          ? "Los archivos persisten en Docker; se recomienda conservar también una copia externa."
+          : "Los archivos se almacenan fuera del servidor mediante Firebase Storage.",
+        ok: Boolean(systemStatus?.storage.persistent),
       },
       {
         title: "IA",
-        value: "Fallback operativo",
-        hint: "El asistente local responde aunque Gemini no esté configurado.",
-        ok: true,
+        value: systemStatus?.ai.configured ? `Gemini · ${systemStatus.ai.model}` : "Fallback local",
+        hint: systemStatus?.ai.configured
+          ? "Gemini está configurado; toda propuesta requiere revisión humana."
+          : "Gemini no está configurado; se utiliza una plantilla local básica.",
+        ok: Boolean(systemStatus),
       },
       {
         title: "Expedientes",
@@ -87,15 +98,15 @@ export default function AjustesPage() {
         ok: true,
       },
     ],
-    [assignments, contracts, user?.email, users]
+    [assignments, contracts, systemStatus, user?.email, users]
   );
 
   return (
     <>
       <header className="topbar">
         <div className="topbar__left">
-          <h1 className="title">Ajustes</h1>
-          <p className="subtitle">Estado operativo del sistema y accesos rápidos de configuración.</p>
+          <h1 className="title">Estado del sistema</h1>
+          <p className="subtitle">Diagnóstico real del entorno y accesos administrativos.</p>
         </div>
 
         <div className="topbar__right">
@@ -117,7 +128,7 @@ export default function AjustesPage() {
       <section className="grid">
         <article className="card" style={{ gridColumn: "1 / span 8" }}>
           <div className="card__title-row">
-            <h2 className="card__title">Configuración operativa</h2>
+            <h2 className="card__title">Diagnóstico operativo</h2>
             <span className="chip">{checks.filter((item) => item.ok).length}/{checks.length}</span>
           </div>
 

@@ -1,0 +1,17 @@
+{
+  "name": "seal-qa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Suite de aseguramiento de calidad para SEAL",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report reports/playwright",
+    "lighthouse": "lhci autorun --config=lighthouse/lighthouserc.cjs"
+  },
+  "devDependencies": {
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.62.1",
+    "jest": "^30.4.2"
+  }
+}

@@ -1,7 +1,8 @@
 const fs = require("fs/promises");
 const path = require("path");
+const jwt = require("jsonwebtoken");
 const { bucket } = require("../config/firebase");
-const { FIREBASE_STORAGE_BUCKET, PORT } = require("../config/env");
+const { FIREBASE_STORAGE_BUCKET, PUBLIC_API_URL, JWT_SECRET } = require("../config/env");
 
 const LOCAL_STORAGE_ROOT = path.join(process.cwd(), ".local-storage");
 
@@ -24,10 +25,15 @@ function localPathFor(storagePath) {
     return path.join(LOCAL_STORAGE_ROOT, ...safePath.split("/"));
 }
 
-function localUrlFor(storagePath) {
+function localUrlFor(storagePath, minutes) {
     const safePath = assertSafeStoragePath(storagePath);
     const encodedPath = safePath.split("/").map(encodeURIComponent).join("/");
-    return `http://localhost:${PORT}/storage/${encodedPath}`;
+    const token = jwt.sign(
+        { purpose: "storage-read", storage_path: safePath },
+        JWT_SECRET,
+        { expiresIn: Math.max(1, Number(minutes || 10)) * 60 }
+    );
+    return `${PUBLIC_API_URL.replace(/\/$/, "")}/storage/${encodedPath}?token=${encodeURIComponent(token)}`;
 }
 
 async function uploadBuffer({ storagePath, buffer, contentType }) {
@@ -83,7 +89,7 @@ async function getDataUrl(storagePath, contentType = "application/octet-stream")
 async function getSignedReadUrl(storagePath, minutes = 10) {
     if (isLocalStorageMode()) {
         await fs.access(localPathFor(storagePath));
-        return localUrlFor(storagePath);
+        return localUrlFor(storagePath, minutes);
     }
 
     const b = bucket();
@@ -105,4 +111,5 @@ module.exports = {
     getSignedReadUrl,
     isLocalStorageMode,
     LOCAL_STORAGE_ROOT,
+    assertSafeStoragePath,
 };

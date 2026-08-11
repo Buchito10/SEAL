@@ -2,6 +2,7 @@
 
 import {
   createAdminAiChat,
+  deleteAdminAiChat,
   getContractVersionTemplate,
   listAdminAiChats,
   listAdminAiMessages,
@@ -82,6 +83,7 @@ export default function PlantillasIaPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [mode, setMode] = useState<StudioMode>("chat");
 
   const selectedContract = useMemo(
@@ -186,6 +188,31 @@ export default function PlantillasIaPage() {
       setError(getErrorMessage(err));
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function deleteActiveChat() {
+    if (!activeChatId || deleting) return;
+    if (!window.confirm("¿Eliminar esta conversación de IA? Esta acción la retirará del historial.")) return;
+
+    setDeleting(true);
+    setError("");
+    setNotice("");
+    try {
+      await deleteAdminAiChat(activeChatId);
+      const remaining = await listAdminAiChats();
+      setChats(remaining);
+      const next = remaining[0] || null;
+      setActiveChatId(next?.id || null);
+      setMessages(next ? await listAdminAiMessages(next.id) : []);
+      setTemplateHtml(next?.ai_last_template_html || "");
+      setReviewHtml(next?.ai_last_template_html || "");
+      setEditNote("");
+      setNotice("Conversación eliminada.");
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -357,6 +384,11 @@ export default function PlantillasIaPage() {
           </div>
 
           <div className="ai-chat-topbar__actions">
+            {activeChatId && (
+              <button className="btn btn--ghost btn--sm" type="button" onClick={() => void deleteActiveChat()} disabled={deleting}>
+                {deleting ? "Eliminando..." : "Eliminar chat"}
+              </button>
+            )}
             {templateHtml && (
               <button className="btn btn--ghost btn--sm" type="button" onClick={() => setMode(mode === "viewer" ? "chat" : "viewer")}>
                 {mode === "viewer" ? "Volver al chat" : "Ver visualizador"}

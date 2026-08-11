@@ -26,9 +26,11 @@ export default function LoginPage() {
 
     try {
       const data = await login(email, password);
-      saveSession(data.token, data.user);
+      saveSession(data.user);
 
-      if (data.user.role === "ADMIN") {
+      if (data.user.must_change_password) {
+        router.push("/cambiar-password");
+      } else if (data.user.role === "ADMIN") {
         router.push("/");
       } else {
         router.push("/cliente/dashboard");
@@ -155,9 +157,9 @@ export default function LoginPage() {
                 </div>
               </label>
 
-              <label className="field login__group">
+              <div className="field login__group">
                 <div className="login__between">
-                  <span className="field__label">Contraseña</span>
+                  <label className="field__label" htmlFor="login-password">Contraseña</label>
                   <button className="login__link login__linkButton" type="button" onClick={openResetModal}>
                     Recuperar contraseña
                   </button>
@@ -165,6 +167,7 @@ export default function LoginPage() {
                 <div className="login__inputWrap">
                   <span className="login__icon">#</span>
                   <input
+                    id="login-password"
                     type="password"
                     placeholder="Contraseña"
                     value={password}
@@ -174,11 +177,15 @@ export default function LoginPage() {
                     required
                   />
                 </div>
-              </label>
+              </div>
 
               <button type="submit" disabled={loading} className="btn btn--primary btn--xl w-full login__cta">
                 {loading ? "Entrando..." : "Entrar"}
               </button>
+
+              <p className="login__accessNote">
+                El acceso a Seal es otorgado mediante invitación por un administrador.
+              </p>
 
               <div className="login__hint">
                 <span className="login__hintDot" />
@@ -189,8 +196,11 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <div
-        className={`modal-overlay login-reset-overlay ${isResetOpen ? "is-visible" : ""}`}
+      {isResetOpen && <div
+        className="modal-overlay login-reset-overlay is-visible"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reset-password-title"
         onMouseDown={(e) => {
           if (e.target === e.currentTarget && !resetLoading) setIsResetOpen(false);
         }}
@@ -199,7 +209,7 @@ export default function LoginPage() {
           <div className="modal__header">
             <div>
               <div className="eyebrow">Recuperación segura</div>
-              <h2 className="card__title">Restablecer contraseña</h2>
+              <h2 className="card__title" id="reset-password-title">Restablecer contraseña</h2>
             </div>
             <button
               className="icon-btn icon-btn--sm"
@@ -254,7 +264,7 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
-      </div>
+      </div>}
     </main>
   );
 }

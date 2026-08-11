@@ -10,6 +10,31 @@ const { getPlaceholderCatalog } = require("../utils/placeholders");
 const DISCLAIMER =
     "⚠️ Plantilla generada con IA. No sustituye revisión humana/legal. Debe ser revisada y validada antes de usarse o firmarse.";
 
+function fallbackResponse(userText) {
+    const asksForTemplate = /plantilla|contrato|genera|redacta|crear/i.test(String(userText || ""));
+    return {
+        assistant_message: [
+            "Gemini no está configurado en este entorno. Preparé una base local para que puedas continuar y revisarla manualmente.",
+            DISCLAIMER,
+        ].join("\n\n"),
+        template_html: asksForTemplate
+            ? [
+                "<h1>Contrato laboral</h1>",
+                "<p>Entre la empresa y <strong>{{ employee.name }}</strong>, con correo {{ employee.email }}, se celebra el presente contrato.</p>",
+                "<h2>Puesto y condiciones</h2>",
+                "<p>Puesto: {{ company.position }}. Área: {{ company.area }}.</p>",
+                "<p>Fecha de inicio: {{ company.start_date }}. Duración: {{ company.duration }}.</p>",
+                "<p>Salario: {{ company.salary }}. Horario: {{ company.work_schedule }}.</p>",
+                "<h2>Firmas</h2>",
+                "<p>Representante legal: {{ company.legal_representative_name }}</p>",
+                "<p>Persona contratada: {{ employee.name }}</p>",
+            ].join("")
+            : null,
+        disclaimer: DISCLAIMER,
+        mode: "fallback",
+    };
+}
+
 function buildSystemInstruction() {
     const cat = getPlaceholderCatalog();
     const all = [...cat.employee, ...cat.company];
@@ -81,6 +106,10 @@ function extractJsonCandidate(data) {
 }
 
 async function generateContractTemplate({ history, userText, currentTemplateHtml, chatContext }) {
+    if (!String(GEMINI_API_KEY || "").trim()) {
+        return fallbackResponse(userText);
+    }
+
     const system = buildSystemInstruction();
 
     const context = chatContext || {};

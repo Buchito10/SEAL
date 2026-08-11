@@ -13,6 +13,7 @@ import {
   listUsers,
   precheckAssignment,
   requestAssignmentProfileUpdate,
+  rejectAdminAssignment,
   sendAssignmentMessage,
   setAssignmentChatStatus,
   type AdminContract,
@@ -120,6 +121,7 @@ function placeholderLabel(key: string) {
     "employee.curp": "CURP",
     "employee.phone": "Teléfono",
     "employee.address_line1": "Dirección",
+    "employee.address_line2": "Dirección complementaria",
     "employee.address_city": "Ciudad",
     "employee.address_state": "Estado",
     "employee.address_zip": "Código postal",
@@ -158,6 +160,7 @@ export default function ContratosPage() {
   const [sending, setSending] = useState(false);
   const [askingAi, setAskingAi] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -439,6 +442,33 @@ export default function ContratosPage() {
     }
   }
 
+  async function onRejectAssignment() {
+    if (!selected || selected.status !== "SIGNED") return;
+    const reason = window.prompt(
+      "Explica por qué se rechaza el contrato firmado. El motivo quedará registrado:",
+      "La firma o los datos requieren corrección."
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      setError("Escribe un motivo para rechazar el contrato.");
+      return;
+    }
+
+    setRejecting(true);
+    setError("");
+    setNotice("");
+    try {
+      const updated = await rejectAdminAssignment(selected.id, reason.trim());
+      setSelected(updated);
+      setNotice("Contrato rechazado. El motivo quedó registrado en el expediente.");
+      await loadAssignments(updated.id);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setRejecting(false);
+    }
+  }
+
   async function onDownloadPdf() {
     if (!selected) return;
 
@@ -636,9 +666,14 @@ export default function ContratosPage() {
                   <span className={statusClass(selected.status)}>{statusLabel(selected.status)}</span>
                   <span className="pill">Chat: {selected.chat_status === "CLOSED" ? "Cerrado" : "Abierto"}</span>
                   {selected.status === "SIGNED" && (
-                    <button className="btn btn--primary btn--sm" onClick={() => void onApproveAssignment()} disabled={approving}>
-                      {approving ? "Aprobando..." : "Aprobar PDF"}
-                    </button>
+                    <>
+                      <button className="btn btn--primary btn--sm" onClick={() => void onApproveAssignment()} disabled={approving || rejecting}>
+                        {approving ? "Aprobando..." : "Aprobar PDF"}
+                      </button>
+                      <button className="btn btn--ghost btn--sm" onClick={() => void onRejectAssignment()} disabled={approving || rejecting}>
+                        {rejecting ? "Rechazando..." : "Rechazar"}
+                      </button>
+                    </>
                   )}
                   {selected.status === "APPROVED" && (
                     <button className="btn btn--soft btn--sm" onClick={() => void onDownloadPdf()} disabled={downloadingPdf}>
@@ -695,6 +730,15 @@ export default function ContratosPage() {
                   >
                     {downloadingPdf ? "Preparando..." : "Descargar PDF final"}
                   </button>
+                </div>
+              )}
+
+              {selected.status === "REJECTED" && (
+                <div className="note" style={{ borderColor: "rgba(190,70,70,.35)", marginBottom: 12 }}>
+                  <div className="note__title text-danger">Contrato rechazado</div>
+                  <div className="note__text">
+                    {selected.approval?.reason || "El expediente fue rechazado por administración."}
+                  </div>
                 </div>
               )}
 
