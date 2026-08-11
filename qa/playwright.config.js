@@ -15,7 +15,6 @@ module.exports = defineConfig({
   use: {
     baseURL,
     browserName: "chromium",
-    channel: "chrome",
     headless: true,
     ignoreHTTPSErrors: baseURL.includes("localhost"),
     screenshot: "only-on-failure",

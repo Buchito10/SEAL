@@ -54,9 +54,17 @@ jobs:
         working-directory: Front
       - run: npm ci
         working-directory: qa
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+        working-directory: qa
+      - name: Compilar Next.js para producción
+        run: npm run build
+        working-directory: Front
+        env:
+          NEXT_PUBLIC_API_URL: /api
       - name: Iniciar Next.js
         run: |
-          npm --prefix Front run dev -- -H 0.0.0.0 > /tmp/seal-next.log 2>&1 &
+          npm --prefix Front run start -- -H 0.0.0.0 > /tmp/seal-next.log 2>&1 &
           for i in {1..30}; do curl -fsS http://127.0.0.1:3000/login && exit 0; sleep 2; done
           cat /tmp/seal-next.log
           exit 1
