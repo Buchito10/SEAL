@@ -2,8 +2,8 @@ const { ok } = require("../utils/response");
 const storageService = require("../services/storage.service");
 const {
     NODE_ENV,
-    GEMINI_API_KEY,
-    GEMINI_MODEL,
+    OPENROUTER_API_KEY,
+    OPENROUTER_MODEL,
     API_RATE_LIMIT_MAX,
     AUTH_COOKIE_SECURE,
 } = require("../config/env");
@@ -19,9 +19,15 @@ async function getSystemStatus(req, res) {
             external_backup_recommended: storageMode === "local",
         },
         ai: {
-            configured: Boolean(String(GEMINI_API_KEY || "").trim()),
-            mode: GEMINI_API_KEY ? "gemini" : "fallback",
-            model: GEMINI_API_KEY ? GEMINI_MODEL : null,
+            configured: Boolean(
+                String(OPENROUTER_API_KEY || "").trim()
+            ),
+            mode: OPENROUTER_API_KEY
+                ? "openrouter"
+                : "fallback",
+            model: OPENROUTER_API_KEY
+                ? OPENROUTER_MODEL
+                : null,
         },
         security: {
             http_only_session_cookie: true,

@@ -69,11 +69,16 @@ const DRAFT_CLEANUP_CRON = process.env.DRAFT_CLEANUP_CRON || "10 3 * * *";
 // Timezone (tu contexto)
 const APP_TZ = process.env.TZ || "America/Mexico_City";
 
-// ===== Gemini (AI contract chats) =====
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-const GEMINI_TEMPERATURE = Number(process.env.GEMINI_TEMPERATURE ?? "0.4");
-const GEMINI_MAX_OUTPUT_TOKENS = getInt("GEMINI_MAX_OUTPUT_TOKENS", 4000);
+// ===== OpenRouter (AI contract chats) =====
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
+const OPENROUTER_TEMPERATURE = Number(
+    process.env.OPENROUTER_TEMPERATURE ?? "0.3"
+);
+const OPENROUTER_MAX_OUTPUT_TOKENS = getInt(
+    "OPENROUTER_MAX_OUTPUT_TOKENS",
+    2500
+);
 
 module.exports = {
     PORT,
@@ -113,8 +118,8 @@ module.exports = {
     DRAFT_CLEANUP_CRON,
     APP_TZ,
 
-    GEMINI_API_KEY,
-    GEMINI_MODEL,
-    GEMINI_TEMPERATURE,
-    GEMINI_MAX_OUTPUT_TOKENS,
+    OPENROUTER_API_KEY,
+    OPENROUTER_MODEL,
+    OPENROUTER_TEMPERATURE,
+    OPENROUTER_MAX_OUTPUT_TOKENS,
 };

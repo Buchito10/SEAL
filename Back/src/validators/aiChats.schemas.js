@@ -9,7 +9,16 @@ const createChatSchema = z.object({
 });
 
 const sendMessageSchema = z.object({
+    // Mensaje escrito realmente por el usuario.
     text: z.string().trim().min(1).max(4000),
+
+    // Plantilla utilizada únicamente como contexto para la IA.
+    // No se guardará como mensaje del usuario.
+    base_template_html: z
+        .string()
+        .max(50000)
+        .optional()
+        .nullable(),
 });
 
 const humanEditSchema = z.object({

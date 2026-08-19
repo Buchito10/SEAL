@@ -188,7 +188,7 @@ export function buildNotifications(
       title: "Sin alertas críticas",
       detail: "No hay contratos pendientes de aprobación ni bloqueos de clientes.",
       when: "ahora",
-      href: "/",
+      href: "/dashboard",
     });
   }
 

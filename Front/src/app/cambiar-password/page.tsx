@@ -22,7 +22,7 @@ export default function CambiarPasswordPage() {
       .then(({ user }) => {
         saveSession(user);
         if (!user.must_change_password) {
-          router.replace(user.role === "ADMIN" ? "/" : "/cliente/dashboard");
+          router.replace(user.role === "ADMIN" ? "/dashboard" : "/cliente/dashboard");
         }
       })
       .catch(() => router.replace("/login"));
@@ -47,7 +47,7 @@ export default function CambiarPasswordPage() {
       const { user } = await changePassword(currentPassword, newPassword);
       updateSessionUser({ ...user, must_change_password: false });
       const currentUser = getUser() || user;
-      router.replace(currentUser.role === "ADMIN" ? "/" : "/cliente/dashboard");
+      router.replace(currentUser.role === "ADMIN" ? "/dashboard" : "/cliente/dashboard");
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {

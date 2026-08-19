@@ -1,5 +1,22 @@
 const { test, expect } = require("@playwright/test");
 
+test.describe("Portada pública", () => {
+  test("muestra la propuesta de SEAL y dirige al inicio de sesión", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(
+      page.getByRole("heading", { name: /Contratos claros/i })
+    ).toBeVisible();
+
+    const accessLink = page.getByRole("link", { name: /Entrar a SEAL/i });
+    await expect(accessLink).toHaveAttribute("href", "/login");
+    await accessLink.click();
+
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: "Iniciar sesión" })).toBeVisible();
+  });
+});
+
 test.describe("Integración del inicio de sesión", () => {
   test("envía el formulario a la API, guarda la sesión y abre el panel", async ({ page }) => {
     let loginPayload;
@@ -62,7 +79,7 @@ test.describe("Integración del inicio de sesión", () => {
     await loginForm.getByPlaceholder("Contraseña").fill("PruebaSegura123!");
     await loginForm.getByRole("button", { name: "Entrar" }).click();
 
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 
     expect(loginPayload).toEqual({

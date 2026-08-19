@@ -68,7 +68,13 @@ async function sendMessage(req, res) {
             chatId: req.params.id,
             userId: req.user.userId,
             userName: req.user.name || "ADMIN",
+
+            // Este sí se guarda como mensaje del usuario.
             text: parsed.text,
+
+            // Esta plantilla solamente sirve como contexto.
+            baseTemplateHtml:
+                parsed.base_template_html || null,
         });
         return ok(res, out, 201);
     } catch (e) {

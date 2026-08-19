@@ -23,7 +23,7 @@ export default function Sidebar() {
   const [user] = useState<SessionUser | null>(() => getUser());
 
   const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
+    if (href === "/dashboard") return pathname === "/dashboard";
     if (href === "/plantillas") return pathname === "/plantillas";
     return pathname === href || pathname.startsWith(`${href}/`);
   };
@@ -40,7 +40,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       {/* 🔷 BRAND = DASHBOARD */}
-      <Link href="/" className="brand brand--link" aria-label="Ir al Dashboard">
+      <Link href="/dashboard" className="brand brand--link" aria-label="Ir al Dashboard">
         <div className="brand__logo">S</div>
         <div className="brand__text">
           <div className="brand__name">Seal</div>

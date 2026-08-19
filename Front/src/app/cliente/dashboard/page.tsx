@@ -259,7 +259,7 @@ export default function ClienteDashboardPage() {
           return;
         }
         if (user.role !== "CLIENT") {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
         void loadAssignments();

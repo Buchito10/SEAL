@@ -85,10 +85,12 @@ export default function AjustesPage() {
       },
       {
         title: "IA",
-        value: systemStatus?.ai.configured ? `Gemini · ${systemStatus.ai.model}` : "Fallback local",
+        value: systemStatus?.ai.configured
+          ? `OpenRouter · ${systemStatus.ai.model}`
+          : "Fallback local",
         hint: systemStatus?.ai.configured
-          ? "Gemini está configurado; toda propuesta requiere revisión humana."
-          : "Gemini no está configurado; se utiliza una plantilla local básica.",
+          ? "La IA está configurada; toda propuesta requiere revisión humana."
+          : "La IA no está configurada; se utiliza una plantilla local básica.",
         ok: Boolean(systemStatus),
       },
       {

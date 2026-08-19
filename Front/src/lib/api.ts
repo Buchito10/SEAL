@@ -41,7 +41,7 @@ export type SystemStatus = {
   };
   ai: {
     configured: boolean;
-    mode: "gemini" | "fallback";
+    mode: "openrouter" | "fallback";
     model?: string | null;
   };
   security: {
@@ -665,11 +665,26 @@ export function listAdminAiMessages(id: string) {
   return apiFetch<AdminAiMessage[]>(`/admin/ai-chats/${id}/messages`);
 }
 
-export function sendAdminAiMessage(id: string, text: string) {
-  return apiFetch<AdminAiGenerateResponse>(`/admin/ai-chats/${id}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ text }),
-  });
+export function sendAdminAiMessage(
+  id: string,
+  text: string,
+  baseTemplateHtml?: string
+) {
+  return apiFetch<AdminAiGenerateResponse>(
+    `/admin/ai-chats/${id}/messages`,
+    {
+      method: "POST",
+
+      body: JSON.stringify({
+        text,
+
+        base_template_html:
+          baseTemplateHtml?.trim()
+            ? baseTemplateHtml
+            : undefined,
+      }),
+    }
+  );
 }
 
 export function saveAdminAiHumanEdit(id: string, input: { template_html: string; edit_note: string }) {

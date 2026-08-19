@@ -67,3 +67,6 @@ Thumbs.db
 .idea/
 backups/
 .env.domain-backup-*
+
+# Paquete fuente usado solamente para integrar la portada
+/landing.zip
