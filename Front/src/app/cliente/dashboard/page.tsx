@@ -1,7 +1,10 @@
 "use client";
 
+import BrandLogo from "@/components/BrandLogo";
+import { QRCodeSVG } from "qrcode.react";
+import ContractAssistant from "@/components/ContractAssistant";
+
 import {
-  askClientAssignmentAi,
   createClientSignatureToken,
   getClientAssignment,
   getClientAssignmentPdf,
@@ -35,12 +38,6 @@ import {
 
 type DetailTab = "chat" | "documento" | "firmar" | "ia" | "actividad";
 
-const AI_SUGGESTIONS = [
-  "Resume los puntos importantes antes de firmar",
-  "Explícame salario, jornada y fechas",
-  "¿Qué obligaciones debo revisar con cuidado?",
-  "¿Hay algo que deba confirmar con administración?",
-];
 
 const EMPTY_PROFILE_FORM: ClientProfileInput = {
   rfc: "",
@@ -124,15 +121,12 @@ export default function ClienteDashboardPage() {
   const [notice, setNotice] = useState("");
 
   const [composer, setComposer] = useState("");
-  const [aiQuestion, setAiQuestion] = useState("¿Qué significa esta parte del contrato?");
-  const [aiAnswer, setAiAnswer] = useState("");
-  const [aiSnippets, setAiSnippets] = useState<string[]>([]);
   const [signatureImageUrl, setSignatureImageUrl] = useState("");
   const [signatureImageFailed, setSignatureImageFailed] = useState(false);
   const [sending, setSending] = useState(false);
-  const [askingAi, setAskingAi] = useState(false);
   const [isSignatureOpen, setIsSignatureOpen] = useState(false);
   const [signatureLink, setSignatureLink] = useState<SignatureTokenLink | null>(null);
+  const signatureLinkInput = useRef<HTMLInputElement>(null);
   const [signatureDirty, setSignatureDirty] = useState(false);
   const [signing, setSigning] = useState(false);
   const [creatingSignatureLink, setCreatingSignatureLink] = useState(false);
@@ -189,8 +183,8 @@ export default function ClienteDashboardPage() {
       const rows = await listClientAssignmentMessages(id);
       if (selectedIdRef.current !== id) {
         setSignatureLink(null);
-        setAiAnswer("");
-        setAiSnippets([]);
+
+
         setSignatureImageUrl("");
         setSignatureImageFailed(false);
       }
@@ -282,10 +276,18 @@ export default function ClienteDashboardPage() {
     };
   }, [assignments]);
 
-  const qrImageUrl = useMemo(() => {
-    if (!signatureLink?.link) return "";
-    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(signatureLink.link)}`;
-  }, [signatureLink]);
+  async function copySignatureLink() {
+    if (!signatureLink) return;
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard unavailable on HTTP");
+      await navigator.clipboard.writeText(signatureLink.link);
+      setNotice("Enlace de firma copiado.");
+    } catch {
+      signatureLinkInput.current?.focus();
+      signatureLinkInput.current?.select();
+      setNotice("Enlace seleccionado. Usa Copiar en el menú de tu dispositivo.");
+    }
+  }
 
   async function handleLogout() {
     try {
@@ -490,23 +492,6 @@ export default function ClienteDashboardPage() {
     }
   }
 
-  async function onAskAi(e: FormEvent) {
-    e.preventDefault();
-    if (!selected || !aiQuestion.trim()) return;
-
-    setAskingAi(true);
-    setError("");
-
-    try {
-      const data = await askClientAssignmentAi(selected.id, aiQuestion.trim());
-      setAiAnswer(data.answer);
-      setAiSnippets(data.snippets || []);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setAskingAi(false);
-    }
-  }
 
   async function onDownloadPdf() {
     if (!selected) return;
@@ -546,6 +531,7 @@ export default function ClienteDashboardPage() {
       <section className="main client-shell">
         <header className="topbar client-topbar">
           <div className="topbar__left">
+            <div className="seal-client-brand"><BrandLogo size="small" /><strong>SEAL</strong><span>Portal del cliente</span></div>
             <h1 className="title">Mis contratos</h1>
             <p className="subtitle">Revisa, conversa con administración y firma tus contratos asignados.</p>
           </div>
@@ -675,7 +661,7 @@ export default function ClienteDashboardPage() {
                       type="button"
                       onClick={() => setActiveTab(tab)}
                     >
-                      {tab[0].toUpperCase() + tab.slice(1)}
+                      {tab === "ia" ? "IA" : tab[0].toUpperCase() + tab.slice(1)}
                     </button>
                   ))}
                 </div>
@@ -807,8 +793,8 @@ export default function ClienteDashboardPage() {
                       <div className="qr-box client-qr-box" style={{ alignItems: "flex-start" }}>
                         <div
                           style={{
-                            width: 132,
-                            height: 132,
+                            width: 176,
+                            height: 176,
                             borderRadius: 16,
                             overflow: "hidden",
                             background: "#fff",
@@ -816,20 +802,14 @@ export default function ClienteDashboardPage() {
                             flex: "0 0 auto",
                           }}
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={qrImageUrl}
-                            alt="QR para firmar desde celular"
-                            width={116}
-                            height={116}
-                            style={{ display: "block" }}
-                          />
+                          <QRCodeSVG value={signatureLink.link} size={160} level="M" marginSize={4} role="img" aria-label="QR para firmar desde celular" style={{ display: "block" }} />
                         </div>
                         <div className="qr-meta">
                           <div className="strong">Escanea para firmar</div>
                           <div className="muted small" style={{ marginTop: 6 }}>
                             Expira: {formatDate(signatureLink.expires_at)}
                           </div>
+                          <input ref={signatureLinkInput} className="control" aria-label="Enlace para firmar" readOnly value={signatureLink.link} onFocus={event => event.currentTarget.select()} style={{ width: "100%", marginTop: 10 }} />
                           <div className="qr-actions">
                             <a className="btn btn--ghost btn--sm" href={signatureLink.link} target="_blank" rel="noreferrer">
                               Abrir enlace
@@ -837,7 +817,7 @@ export default function ClienteDashboardPage() {
                             <button
                               className="btn btn--ghost btn--sm"
                               type="button"
-                              onClick={() => void navigator.clipboard?.writeText(signatureLink.link)}
+                              onClick={() => void copySignatureLink()}
                             >
                               Copiar link
                             </button>
@@ -847,77 +827,8 @@ export default function ClienteDashboardPage() {
                     )}
                   </div>
                 ) : activeTab === "ia" ? (
-                  <div className="client-ai">
-                    <section className="client-ai__hero">
-                      <div>
-                        <div className="eyebrow">Asistente de lectura</div>
-                        <h3>Resuelve dudas antes de firmar</h3>
-                        <p>
-                          La IA revisa el texto renderizado de este contrato y te señala fragmentos relacionados. Sus respuestas son orientativas.
-                        </p>
-                      </div>
-                      <span className="chip chip--ok">Contrato v{selected.contract_version || 1}</span>
-                    </section>
 
-                    <section className="client-ai__grid">
-                      <div className="client-ai__panel">
-                        <div className="note__title">Preguntas rápidas</div>
-                        <div className="client-ai__suggestions">
-                          {AI_SUGGESTIONS.map((question) => (
-                            <button
-                              key={question}
-                              type="button"
-                              className="btn btn--ghost btn--sm"
-                              onClick={() => setAiQuestion(question)}
-                            >
-                              {question}
-                            </button>
-                          ))}
-                        </div>
-
-                        <form className="client-ai__form" onSubmit={onAskAi}>
-                          <label className="field">
-                            <span className="field__label">Tu duda</span>
-                            <textarea
-                              className="control"
-                              rows={5}
-                              value={aiQuestion}
-                              onChange={(e) => setAiQuestion(e.target.value)}
-                              placeholder="Ej. ¿qué significa la cláusula de confidencialidad?"
-                            />
-                          </label>
-                          <button className="btn btn--primary" type="submit" disabled={askingAi || !aiQuestion.trim()}>
-                            {askingAi ? "Buscando en el contrato..." : "Preguntar a la IA"}
-                          </button>
-                        </form>
-                      </div>
-
-                      <div className="client-ai__answer">
-                        <div className="card__title-row">
-                          <h3 className="card__title">Respuesta</h3>
-                          <span className="badge badge--sign">Orientativa</span>
-                        </div>
-
-                        {aiAnswer ? (
-                          <>
-                            <div className="client-ai__bubble">{aiAnswer}</div>
-                            {aiSnippets.length > 0 && (
-                              <div className="client-ai__snippets">
-                                <div className="note__title">Partes encontradas</div>
-                                {aiSnippets.map((snippet) => (
-                                  <blockquote key={snippet}>{snippet}</blockquote>
-                                ))}
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="client-ai__empty">
-                            Haz una pregunta o elige una sugerencia para que el asistente busque dentro de tu contrato.
-                          </div>
-                        )}
-                      </div>
-                    </section>
-                  </div>
+                <ContractAssistant key={selected.id} assignmentId={selected.id} role="CLIENT" title={selected.contract_title || "Contrato"} />
                 ) : (
                   <div className="log">
                     {(selected.events || []).length === 0 ? (

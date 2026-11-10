@@ -291,7 +291,7 @@ export default function DashboardHome() {
       <header className="topbar dashboard-topbar">
         <div className="topbar__left">
           <div className="eyebrow">Panel administrativo</div>
-          <h1 className="title">Dashboard</h1>
+          <h1 className="title">Resumen</h1>
         </div>
 
         <div className="topbar__right">
@@ -334,7 +334,7 @@ export default function DashboardHome() {
           <div className="dashboard-hero-foot">
             <div className="dashboard-trust dashboard-trust--inline">
               <Icon name="shield" size={14} />
-              <span>Cifrado de sesión</span>
+              <span>Sesión protegida</span>
               <span>Roles autorizados</span>
               <span>Evidencia auditable</span>
             </div>

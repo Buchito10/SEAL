@@ -262,6 +262,7 @@ async function generateContractTemplate({
         "https://openrouter.ai/api/v1/chat/completions",
         {
             method: "POST",
+            signal: AbortSignal.timeout(45000),
 
             headers: {
                 Authorization: `Bearer ${OPENROUTER_API_KEY}`,
@@ -271,7 +272,14 @@ async function generateContractTemplate({
 
             body: JSON.stringify(body),
         }
-    );
+    ).catch(error => {
+        const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError";
+        const failure = new Error(timedOut
+            ? "La IA tardó demasiado en responder. Reintenta o continúa con una plantilla existente."
+            : "No se pudo conectar con la IA. Revisa la conexión a internet e intenta de nuevo.");
+        failure.code = timedOut ? 504 : 502;
+        throw failure;
+    });
 
     if (!response.ok) {
         const text = await response.text();
@@ -283,7 +291,9 @@ async function generateContractTemplate({
         );
 
         const err = new Error(
-            `OpenRouter API error (${response.status})`
+            response.status === 429
+                ? "La IA alcanzó su límite temporal de uso. Intenta más tarde o continúa con las plantillas disponibles."
+                : `No se pudo obtener una respuesta de la IA (${response.status}). Puedes reintentar.`
         );
 
         err.code = 502;

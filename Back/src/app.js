@@ -57,7 +57,8 @@ app.use(cors({
     },
 }));
 app.use(express.json({ limit: "1mb" }));
-app.use(morgan("dev"));
+morgan.token("safe-path", (req) => req.originalUrl.split("?")[0]);
+app.use(morgan(":method :safe-path :status :response-time ms"));
 app.use(apiLimiter);
 
 app.get("/health", (req, res) => res.json({ ok: true }));

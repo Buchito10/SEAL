@@ -1,5 +1,6 @@
 "use client";
 
+import BrandLogo from "@/components/BrandLogo";
 import { changePassword, getCurrentSession } from "@/lib/api";
 import { getUser, saveSession, updateSessionUser } from "@/lib/auth";
 import { useRouter } from "next/navigation";
@@ -62,7 +63,7 @@ export default function CambiarPasswordPage() {
       <section className="login__wrap login__wrap--auth">
         <form className="login__card login__card--form form-grid" onSubmit={handleSubmit}>
           <div className="login__brand">
-            <div className="login__logo">S</div>
+            <BrandLogo />
             <div>
               <div className="login__brandName">Seal</div>
               <div className="login__brandSub">Protección de la cuenta</div>

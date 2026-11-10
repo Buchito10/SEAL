@@ -28,11 +28,12 @@ import {
 } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import Link from "next/link";
+import TemplateEditor, { sanitizeTemplate, type TemplateEditorHandle } from "@/components/TemplateEditor";
+import Modal from "@/components/Modal";
 
 type ViewMode = "catalogo" | "tabla";
 type StatusFilter = "Todas" | "Activa";
 type EditorMode = "same_version" | "new_version";
-type EditorView = "visual" | "html";
 
 const PAGE_SIZE = 9;
 
@@ -123,8 +124,8 @@ function versionTitle(version?: ContractVersionSummary | null) {
 }
 
 export default function PlantillasPage() {
-  const visualEditorRef = useRef<HTMLDivElement | null>(null);
-  const editorHtmlRef = useRef("");
+  const templateEditorRef = useRef<TemplateEditorHandle>(null);
+  const [savedEditorHtml, setSavedEditorHtml] = useState("");
 
   const [contracts, setContracts] = useState<AdminContract[]>([]);
   const [selected, setSelected] = useState<AdminContract | null>(null);
@@ -146,6 +147,8 @@ export default function PlantillasPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const editorTrigger = useRef<HTMLElement | null>(null);
+  const comparisonTrigger = useRef<HTMLElement | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -156,7 +159,6 @@ export default function PlantillasPage() {
   const [editorMode, setEditorMode] = useState<EditorMode>("same_version");
   const [editorVersion, setEditorVersion] = useState<ContractVersionTemplate | null>(null);
   const [editorHtml, setEditorHtml] = useState("");
-  const [editorView, setEditorView] = useState<EditorView>("visual");
   const [commitMessage, setCommitMessage] = useState("");
   const [editorLoading, setEditorLoading] = useState(false);
   const [editorSaving, setEditorSaving] = useState(false);
@@ -228,22 +230,12 @@ export default function PlantillasPage() {
   useEffect(() => {
     if (!editorOpen || !selected?.id || !lockOwner) return;
 
-    const onBeforeUnload = () => {
-      void releaseContractLock(selected.id);
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (editorHtml !== savedEditorHtml) { event.preventDefault(); event.returnValue = ""; }
     };
-
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [editorOpen, lockOwner, selected?.id]);
-
-  useEffect(() => {
-    editorHtmlRef.current = editorHtml;
-  }, [editorHtml]);
-
-  useEffect(() => {
-    if (!editorOpen || editorView !== "visual" || !visualEditorRef.current) return;
-    visualEditorRef.current.innerHTML = editorHtmlRef.current || "<p><br></p>";
-  }, [editorOpen, editorView, editorVersion?.version]);
+  }, [editorOpen, lockOwner, selected?.id, editorHtml, savedEditorHtml]);
 
   const areas = useMemo(() => {
     const unique = new Set(contracts.map((contract) => contract.area).filter(Boolean));
@@ -296,10 +288,8 @@ export default function PlantillasPage() {
       const clean = token.replace(/[{}]/g, "").trim();
       if (clean) found.add(clean);
     });
-    editorVersion?.placeholders_used?.forEach((item) => found.add(item));
-    selected?.base_placeholders_used?.forEach((item) => found.add(item));
     return Array.from(found).sort();
-  }, [editorHtml, editorVersion?.placeholders_used, selected?.base_placeholders_used]);
+  }, [editorHtml]);
 
   const placeholderGroups = useMemo(() => {
     if (!placeholderCatalog) return FALLBACK_PLACEHOLDER_GROUPS;
@@ -322,39 +312,13 @@ export default function PlantillasPage() {
     setIsModalOpen(false);
   }
 
-  function syncVisualHtml() {
-    setEditorHtml(visualEditorRef.current?.innerHTML || "");
-  }
-
-  function runEditorCommand(command: string, value?: string) {
-    if (editorView !== "visual") return;
-    visualEditorRef.current?.focus();
-    document.execCommand(command, false, value);
-    syncVisualHtml();
-  }
-
-  function setEditorBlock(block: string) {
-    runEditorCommand("formatBlock", block);
-  }
-
   function insertPlaceholder(key: string) {
-    if (!key) return;
-    if (editorView !== "visual") {
-      setEditorHtml((current) => `${current} {{ ${key} }}`);
-      return;
-    }
-    visualEditorRef.current?.focus();
-    document.execCommand("insertText", false, `{{ ${key} }}`);
-    syncVisualHtml();
-  }
-
-  function switchEditorView(next: EditorView) {
-    if (next === "html") syncVisualHtml();
-    setEditorView(next);
+    templateEditorRef.current?.insertPlaceholder(key);
   }
 
   async function openEditor(mode: EditorMode) {
     if (!selected) return;
+    editorTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     setError("");
     setNotice("");
@@ -363,8 +327,10 @@ export default function PlantillasPage() {
     setCommitMessage("");
     setRecentDraft(null);
 
+    let acquired = false;
     try {
       await acquireContractLock(selected.id);
+      acquired = true;
       setLockOwner(true);
 
       const versionNumber = selected.current_version || 1;
@@ -374,12 +340,13 @@ export default function PlantillasPage() {
       ]);
       setEditorVersion(template);
       setEditorHtml(template.template_html || "");
-      setEditorView("visual");
+      setSavedEditorHtml(template.template_html || "");
       const latestDraft = drafts[0];
       setRecentDraft(latestDraft?.id ? { draft_id: latestDraft.id, draft: latestDraft } : null);
       setEditorOpen(true);
       await loadSelectedDetails(selected.id);
     } catch (err) {
+      if (acquired) await releaseContractLock(selected.id).catch(() => {});
       setLockOwner(false);
       setError(getErrorMessage(err));
     } finally {
@@ -388,13 +355,13 @@ export default function PlantillasPage() {
   }
 
   async function closeEditor() {
-    if (editorSaving) return;
+    if (editorSaving || draftBusy) return;
+    if (editorHtml !== savedEditorHtml && !window.confirm("Tienes cambios sin guardar. ¿Cerrar y descartarlos?")) return;
 
     const contractId = selected?.id;
     setEditorOpen(false);
     setEditorVersion(null);
     setEditorHtml("");
-    setEditorView("visual");
     setCommitMessage("");
 
     if (contractId && lockOwner) {
@@ -410,7 +377,7 @@ export default function PlantillasPage() {
 
   async function saveEditor(e: FormEvent) {
     e.preventDefault();
-    if (!selected || !editorVersion) return;
+    if (!selected || !editorVersion || !lockOwner || editorSaving || draftBusy) return;
 
     const commit = commitMessage.trim();
     if (commit.length < 5) {
@@ -429,28 +396,33 @@ export default function PlantillasPage() {
       if (shouldCreateVersion) {
         await createContractVersion(selected.id, {
           from_version: version,
-          template_html: editorHtml,
+          template_html: sanitizeTemplate(editorHtml),
           commit,
           note: version === 1 ? "Nueva versión creada desde base v1" : "Nueva versión creada desde editor",
         });
         setNotice("Nueva versión publicada correctamente.");
       } else {
         await saveContractTemplateSameVersion(selected.id, version, {
-          template_html: editorHtml,
+          template_html: sanitizeTemplate(editorHtml),
           commit,
         });
         setNotice("Plantilla actualizada correctamente.");
       }
 
-      await releaseContractLock(selected.id);
+      setSavedEditorHtml(editorHtml);
+      const released = await releaseContractLock(selected.id).then(() => true).catch(() => false);
       setLockOwner(false);
       setEditorOpen(false);
       setEditorVersion(null);
       setEditorHtml("");
-      setEditorView("visual");
       setCommitMessage("");
-      await loadContracts();
-      await loadSelectedDetails(selected.id);
+      try {
+        await loadContracts();
+        await loadSelectedDetails(selected.id);
+      } catch {
+        setNotice((message) => `${message} No se pudo actualizar la lista; recarga para verla. No necesitas guardar de nuevo.`);
+      }
+      if (!released) setNotice((message) => `${message} La reserva de edición se liberará al vencer.`);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -522,6 +494,7 @@ export default function PlantillasPage() {
       setError("Se necesitan al menos dos versiones para comparar.");
       return;
     }
+    comparisonTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const latest = selected.current_version || versions[versions.length - 1]?.version || 1;
     const previous = versions.filter((item) => item.version < latest).at(-1)?.version || 1;
 
@@ -539,12 +512,11 @@ export default function PlantillasPage() {
   }
 
   function currentEditorHtml() {
-    if (editorView === "visual") return visualEditorRef.current?.innerHTML || editorHtml;
-    return editorHtml;
+    return sanitizeTemplate(editorHtml);
   }
 
   async function onSaveDraft() {
-    if (!selected || !editorVersion || draftBusy) return;
+    if (!selected || !editorVersion || !lockOwner || draftBusy || editorSaving) return;
     const html = currentEditorHtml();
     if (!html.trim()) {
       setError("El borrador no puede estar vacío.");
@@ -561,6 +533,7 @@ export default function PlantillasPage() {
         template_html: html,
       });
       setRecentDraft(saved);
+      setSavedEditorHtml(html);
       setNotice(`Borrador guardado. Expira ${formatDate(saved.draft.expires_at)}.`);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -570,17 +543,15 @@ export default function PlantillasPage() {
   }
 
   async function onReloadDraft() {
-    if (!selected || !recentDraft || draftBusy) return;
+    if (!selected || !recentDraft || draftBusy || editorSaving) return;
+    if (editorHtml !== savedEditorHtml && !window.confirm("Recuperar el borrador reemplazará tus cambios sin guardar. ¿Continuar?")) return;
     setDraftBusy(true);
     setError("");
     try {
       const loaded = await getContractDraft(selected.id, recentDraft.draft_id);
       setRecentDraft(loaded);
       setEditorHtml(loaded.draft.template_html);
-      editorHtmlRef.current = loaded.draft.template_html;
-      if (editorView === "visual" && visualEditorRef.current) {
-        visualEditorRef.current.innerHTML = loaded.draft.template_html;
-      }
+      setSavedEditorHtml(loaded.draft.template_html);
       setNotice("Borrador recuperado en el editor.");
     } catch (err) {
       setError(getErrorMessage(err));
@@ -590,7 +561,8 @@ export default function PlantillasPage() {
   }
 
   async function onPublishDraft() {
-    if (!selected || !recentDraft || draftBusy) return;
+    if (!selected || !recentDraft || !lockOwner || draftBusy || editorSaving) return;
+    if (editorHtml !== recentDraft.draft.template_html && !window.confirm("Se publicará el borrador guardado, sin los cambios posteriores del editor. ¿Continuar?")) return;
     const commit = commitMessage.trim();
     if (commit.length < 5) {
       setError("Escribe un mensaje de cambio de al menos 5 caracteres para publicar.");
@@ -993,12 +965,7 @@ export default function PlantillasPage() {
 
       </section>
 
-      <div
-        className={`modal-overlay ${isModalOpen ? "is-visible" : ""}`}
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) closeModal();
-        }}
-      >
+      <Modal open={isModalOpen} label="Subir plantilla" onClose={closeModal}>
         <div className="modal card" style={{ maxWidth: 650 }} onMouseDown={(e) => e.stopPropagation()}>
           <div className="modal__header">
             <h2 className="card__title">Subir plantilla</h2>
@@ -1008,6 +975,7 @@ export default function PlantillasPage() {
           </div>
 
           <div className="modal__body">
+            {error && <p className="seal-error" role="alert">{error}</p>}
             <form className="form-grid" onSubmit={onSave}>
               <label className="field">
                 <span className="field__label">Nombre de plantilla *</span>
@@ -1072,14 +1040,9 @@ export default function PlantillasPage() {
             </form>
           </div>
         </div>
-      </div>
+      </Modal>
 
-      <div
-        className={`modal-overlay ${editorOpen ? "is-visible" : ""}`}
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) void closeEditor();
-        }}
-      >
+      <Modal open={editorOpen} label="Editor de plantilla" onClose={closeEditor} returnFocusRef={editorTrigger}>
         <div className="modal card templates-editor-modal" onMouseDown={(e) => e.stopPropagation()}>
           <div className="modal__header">
             <div>
@@ -1098,162 +1061,16 @@ export default function PlantillasPage() {
           </div>
 
           <form className="modal__body templates-editor templates-editor--word" onSubmit={saveEditor}>
-            <div className="templates-editor__ribbon">
-              <div className="templates-editor__tabs">
-                <button
-                  type="button"
-                  className={`templates-editor__tab ${editorView === "visual" ? "is-active" : ""}`}
-                  onClick={() => switchEditorView("visual")}
-                >
-                  Documento
-                </button>
-                <button
-                  type="button"
-                  className={`templates-editor__tab ${editorView === "html" ? "is-active" : ""}`}
-                  onClick={() => switchEditorView("html")}
-                >
-                  HTML
-                </button>
-              </div>
-
-              <div className="templates-editor__tools" aria-label="Herramientas de formato">
-                <select
-                  className="control templates-editor__select"
-                  value=""
-                  onChange={(e) => {
-                    setEditorBlock(e.target.value);
-                    e.currentTarget.value = "";
-                  }}
-                  disabled={editorSaving || editorView !== "visual"}
-                  aria-label="Estilo de párrafo"
-                >
-                  <option value="" disabled>
-                    Estilo
-                  </option>
-                  <option value="p">Párrafo</option>
-                  <option value="h1">Título 1</option>
-                  <option value="h2">Título 2</option>
-                  <option value="h3">Título 3</option>
-                </select>
-
-                {[
-                  ["bold", "B", "Negritas"],
-                  ["italic", "I", "Cursivas"],
-                  ["underline", "U", "Subrayado"],
-                ].map(([command, label, title]) => (
-                  <button
-                    key={command}
-                    type="button"
-                    className="templates-editor__tool"
-                    title={title}
-                    disabled={editorSaving || editorView !== "visual"}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => runEditorCommand(command)}
-                  >
-                    {label}
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  className="templates-editor__tool"
-                  title="Lista con viñetas"
-                  disabled={editorSaving || editorView !== "visual"}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => runEditorCommand("insertUnorderedList")}
-                >
-                  •
-                </button>
-                <button
-                  type="button"
-                  className="templates-editor__tool"
-                  title="Lista numerada"
-                  disabled={editorSaving || editorView !== "visual"}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => runEditorCommand("insertOrderedList")}
-                >
-                  1.
-                </button>
-
-                {[
-                  ["justifyLeft", "Izquierda"],
-                  ["justifyCenter", "Centro"],
-                  ["justifyRight", "Derecha"],
-                ].map(([command, title]) => (
-                  <button
-                    key={command}
-                    type="button"
-                    className="templates-editor__tool"
-                    title={title}
-                    disabled={editorSaving || editorView !== "visual"}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => runEditorCommand(command)}
-                  >
-                    {title === "Izquierda" ? "L" : title === "Centro" ? "C" : "R"}
-                  </button>
-                ))}
-
-                <select
-                  className="control templates-editor__placeholder-select"
-                  value=""
-                  onChange={(e) => {
-                    insertPlaceholder(e.target.value);
-                    e.currentTarget.value = "";
-                  }}
-                  disabled={editorSaving}
-                  aria-label="Insertar campo"
-                >
-                  <option value="" disabled>
-                    Insertar campo
-                  </option>
-                  {placeholderGroups.map((group) => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.items.map(([key, label]) => (
-                        <option key={key} value={key}>
-                          {label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-            </div>
-
+            {(error || notice) && <div role={error ? "alert" : "status"} className={error ? "seal-error" : "seal-editor-feedback"}>{error || notice}</div>}
+            <p className="seal-editor-feedback" role="status">{editorHtml !== savedEditorHtml ? "Tienes cambios sin guardar" : "Sin cambios pendientes"}</p>
             <div className="templates-editor__workbench templates-editor__workbench--word">
-              <section className="templates-editor__canvas">
-                {editorView === "visual" ? (
-                  <div className="templates-editor__page-shell">
-                    <div
-                      ref={visualEditorRef}
-                      className="templates-editor__page"
-                      contentEditable={!editorSaving}
-                      suppressContentEditableWarning
-                      role="textbox"
-                      aria-label="Editor visual de plantilla"
-                      spellCheck
-                      onInput={syncVisualHtml}
-                      onBlur={syncVisualHtml}
-                    />
-                  </div>
-                ) : (
-                  <label className="field templates-editor__source">
-                    <span className="field__label">HTML de la plantilla</span>
-                    <textarea
-                      className="control templates-editor__textarea"
-                      value={editorHtml}
-                      onChange={(e) => setEditorHtml(e.target.value)}
-                      disabled={editorSaving}
-                      spellCheck={false}
-                    />
-                  </label>
-                )}
-              </section>
+              <TemplateEditor ref={templateEditorRef} value={editorHtml} onChange={setEditorHtml} groups={placeholderGroups} disabled={editorSaving || draftBusy || !lockOwner} />
 
               <aside className="templates-editor__side">
                 <div className="templates-editor__panel">
                   <div className="note__title">Versión</div>
                   <div className="templates-editor__status">
-                    <span className="badge badge--done">Lock activo</span>
+                    <span className={lockOwner ? "badge badge--done" : "badge badge--draft"}>{lockOwner ? "Edición reservada para ti" : "Reserva de edición vencida"}</span>
                     <span className="chip">v{selected?.current_version || 1}</span>
                   </div>
                   <div className="muted small">
@@ -1295,8 +1112,8 @@ export default function PlantillasPage() {
                   <div className="note__title">Guardado</div>
                   <div className="muted small">
                     {(editorMode === "new_version" || (selected?.current_version || 1) === 1)
-                      ? "El cambio quedará registrado como nueva versión con tu commit."
-                      : "El historial conservará el commit con fecha y usuario."}
+                      ? "El cambio quedará registrado como nueva versión con tu mensaje de cambio."
+                      : "El historial conservará el cambio con fecha y usuario."}
                   </div>
                 </div>
 
@@ -1318,28 +1135,23 @@ export default function PlantillasPage() {
               <button type="button" className="btn btn--ghost" onClick={() => void closeEditor()} disabled={editorSaving}>
                 Cancelar
               </button>
-              <button type="button" className="btn btn--soft" onClick={() => void onSaveDraft()} disabled={editorSaving || draftBusy || !editorHtml.trim()}>
+              <button type="button" className="btn btn--soft" onClick={() => void onSaveDraft()} disabled={!lockOwner || editorSaving || draftBusy || !editorHtml.trim()}>
                 {draftBusy ? "Procesando..." : "Guardar borrador"}
               </button>
               {recentDraft && (
-                <button type="button" className="btn btn--soft" onClick={() => void onPublishDraft()} disabled={editorSaving || draftBusy || commitMessage.trim().length < 5}>
+                <button type="button" className="btn btn--soft" onClick={() => void onPublishDraft()} disabled={!lockOwner || editorSaving || draftBusy || commitMessage.trim().length < 5}>
                   Publicar borrador
                 </button>
               )}
-              <button type="submit" className="btn btn--primary" disabled={editorSaving || !editorHtml.trim() || commitMessage.trim().length < 5}>
-                {editorSaving ? "Guardando..." : "Guardar con commit"}
+              <button type="submit" className="btn btn--primary" disabled={!lockOwner || draftBusy || editorSaving || !editorHtml.trim() || commitMessage.trim().length < 5}>
+                {editorSaving ? "Guardando..." : "Guardar versión"}
               </button>
             </div>
           </form>
         </div>
-      </div>
+      </Modal>
 
-      <div
-        className={`modal-overlay ${comparisonOpen ? "is-visible" : ""}`}
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setComparisonOpen(false);
-        }}
-      >
+      <Modal open={comparisonOpen} label="Comparación de versiones" onClose={() => setComparisonOpen(false)} returnFocusRef={comparisonTrigger}>
         <div className="modal card" style={{ maxWidth: 1100 }} onMouseDown={(event) => event.stopPropagation()}>
           <div className="modal__header">
             <div>
@@ -1356,13 +1168,13 @@ export default function PlantillasPage() {
                   <div className="muted small" style={{ marginBottom: 12 }}>
                     {(version.placeholders_used || []).length} campos · {(version.commits || []).length} cambios registrados
                   </div>
-                  <div className="document-page" dangerouslySetInnerHTML={{ __html: version.template_html }} />
+                  <div className="document-page" dangerouslySetInnerHTML={{ __html: sanitizeTemplate(version.template_html) }} />
                 </section>
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </Modal>
     </div>
   );
 }

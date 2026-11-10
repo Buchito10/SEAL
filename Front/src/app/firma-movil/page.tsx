@@ -1,5 +1,6 @@
 "use client";
 
+import BrandLogo from "@/components/BrandLogo";
 import {
   signMobileAssignment,
   verifyMobileSignatureToken,
@@ -172,7 +173,7 @@ function MobileSignatureContent() {
         <div className="login__card signature-mobile__card" style={{ maxWidth: 720 }}>
           <div className="login__header">
             <div className="login__brand">
-              <div className="login__logo">S</div>
+              <BrandLogo />
               <div>
                 <div className="login__brandName">Seal</div>
                 <div className="login__brandSub">Firma móvil</div>

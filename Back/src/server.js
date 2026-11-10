@@ -6,7 +6,7 @@ const { startDraftCleanupJob } = require("./jobs/draftCleanup.job");
 
 initFirebase();
 
-app.listen(PORT, () => {
+app.listen(PORT, process.env.HOST || "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
 
     // Local cleanup job (drafts expiran y se borran solos)

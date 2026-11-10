@@ -17,6 +17,10 @@ function isEmailConfigured() {
 }
 
 async function sendMailOrLog(mail) {
+    // Reserved .test addresses identify fictitious demo accounts, not mailboxes.
+    if (/@[^@\s]+\.test$/i.test(String(mail.to || ""))) {
+        return { skipped: true, reason: "DEMO_ADDRESS" };
+    }
     if (!isEmailConfigured()) {
         console.log("[email:dev-skip]", {
             to: mail.to,
@@ -36,6 +40,9 @@ function getTransporter() {
         host: SMTP_HOST,
         port: SMTP_PORT,
         secure: SMTP_PORT === 465, // 465 = SSL
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 20000,
         auth: {
             user: SMTP_USER,
             pass: SMTP_PASS,

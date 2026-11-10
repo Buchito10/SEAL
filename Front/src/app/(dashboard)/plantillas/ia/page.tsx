@@ -1,9 +1,12 @@
 "use client";
 
+import BrandLogo from "@/components/BrandLogo";
 import {
   createAdminAiChat,
   deleteAdminAiChat,
   getContractVersionTemplate,
+  getPlaceholderCatalog,
+  type PlaceholderCatalog,
   listAdminAiChats,
   listAdminAiMessages,
   listContracts,
@@ -15,7 +18,9 @@ import {
   type AdminContract,
 } from "@/lib/api";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ChatAnswer, ChatComposer, ChatQuestion, ChatThinking, ChatTranscript } from "@/components/Chat";
+import TemplateEditor, { sanitizeTemplate } from "@/components/TemplateEditor";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 const EMPTY_PUBLISH = {
   title: "",
@@ -100,7 +105,24 @@ export default function PlantillasIaPage() {
   const [publishing, setPublishing] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [catalog, setCatalog] = useState<PlaceholderCatalog | null>(null);
+  const selecting = useRef(false);
   const [mode, setMode] = useState<StudioMode>("chat");
+
+  useEffect(() => {
+    void getPlaceholderCatalog().then(setCatalog).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (reviewHtml === templateHtml) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [reviewHtml, templateHtml]);
+
+  function mayLeaveReview() {
+    return reviewHtml === templateHtml || window.confirm("Tienes cambios manuales sin publicar. ¿Descartarlos y continuar?");
+  }
 
   const selectedContract = useMemo(
     () =>
@@ -188,40 +210,19 @@ export default function PlantillasIaPage() {
     void loadInitial();
   }, []);
 
-  async function selectChat(
-    chat: AdminAiChat
-  ) {
-    setActiveChatId(chat.id);
-
-    setTemplateHtml(
-      chat.ai_last_template_html || ""
-    );
-
-    setReviewHtml(
-      chat.ai_last_template_html || ""
-    );
-
-    setPublishForm({
-      title:
-        chat.title_hint ||
-        "Plantilla generada con IA",
-
-      area:
-        chat.area ||
-        "General",
-
-      position:
-        chat.position ||
-        "Por definir",
-    });
-
-    setMessages(
-      await listAdminAiMessages(
-        chat.id
-      )
-    );
-
-    setMode("chat");
+  async function selectChat(chat: AdminAiChat) {
+    if (generating || publishing || selecting.current || chat.id === activeChatId || !mayLeaveReview()) return;
+    selecting.current = true;
+    setLoading(true); setError("");
+    try {
+      const rows = await listAdminAiMessages(chat.id);
+      setActiveChatId(chat.id);
+      setTemplateHtml(chat.ai_last_template_html || "");
+      setReviewHtml(chat.ai_last_template_html || "");
+      setPublishForm({ title: chat.title_hint || "Plantilla generada con IA", area: chat.area || "General", position: chat.position || "Por definir" });
+      setMessages(rows); setEditNote(""); setNotice(""); setMode("chat");
+    } catch (err) { setError(getErrorMessage(err)); }
+    finally { selecting.current = false; setLoading(false); }
   }
 
   async function ensureChat() {
@@ -259,6 +260,7 @@ export default function PlantillasIaPage() {
   }
 
   async function startNewChat() {
+    if (loading || generating || publishing || !mayLeaveReview()) return;
     setError("");
     setNotice("");
     setGenerating(true);
@@ -391,9 +393,13 @@ export default function PlantillasIaPage() {
       return;
     }
 
+    if (loading || !mayLeaveReview()) return;
     setError("");
     setNotice("");
     setGenerating(true);
+    const optimisticId = `local-${Date.now()}`;
+    setMessages(current => [...current, { id: optimisticId, role: "user", text, created_at: new Date().toISOString() }]);
+    setPrompt("");
 
     try {
       const chatId =
@@ -449,25 +455,6 @@ export default function PlantillasIaPage() {
        * conservamos el mensaje real escrito
        * por el usuario.
        */
-      const localMessage: AdminAiMessage =
-        {
-          id: `local-${Date.now()}`,
-
-          role: "user",
-
-          text,
-
-          created_at:
-            new Date().toISOString(),
-        };
-
-      setMessages((current) => [
-        ...current,
-        localMessage,
-      ]);
-
-      setPrompt("");
-
       /*
        * Ahora enviamos:
        *
@@ -508,14 +495,16 @@ export default function PlantillasIaPage() {
           "La IA generó una propuesta. Revísala y edítala antes de publicar."
         );
 
-        setMode("viewer");
+        setMode("chat");
       }
 
       const refreshed =
-        await listAdminAiChats();
+        await listAdminAiChats().catch(() => null);
 
-      setChats(refreshed);
+      if (refreshed) setChats(refreshed);
     } catch (err) {
+      setPrompt(current => current || text);
+      setMessages((current) => current.filter((message) => message.id !== optimisticId));
       setError(
         getErrorMessage(err)
       );
@@ -563,7 +552,7 @@ export default function PlantillasIaPage() {
         activeChatId,
         {
           template_html:
-            reviewHtml,
+            sanitizeTemplate(reviewHtml),
 
           edit_note:
             editNote.trim(),
@@ -585,17 +574,17 @@ export default function PlantillasIaPage() {
           }
         );
 
+      setTemplateHtml(reviewHtml);
       setNotice(
         `Plantilla "${contract.title}" publicada como contrato base v1.`
       );
 
-      setContracts(
-        await listContracts()
-      );
-
-      setChats(
-        await listAdminAiChats()
-      );
+      const [contractsResult, chatsResult] = await Promise.allSettled([listContracts(), listAdminAiChats()]);
+      if (contractsResult.status === "fulfilled") setContracts(contractsResult.value);
+      if (chatsResult.status === "fulfilled") setChats(chatsResult.value);
+      if (contractsResult.status === "rejected" || chatsResult.status === "rejected") {
+        setNotice(`Plantilla "${contract.title}" publicada como contrato base v1. No se pudo actualizar la lista; recarga para verla. No necesitas publicar de nuevo.`);
+      }
     } catch (err) {
       setError(
         getErrorMessage(err)
@@ -656,6 +645,7 @@ export default function PlantillasIaPage() {
               (chat) => (
                 <button
                   key={chat.id}
+                  disabled={loading || generating || publishing || deleting}
                   type="button"
                   className={`ai-chat-history-item ${
                     chat.id ===
@@ -829,19 +819,17 @@ export default function PlantillasIaPage() {
 
         {mode === "chat" ? (
           <>
-            <section
-              className={`ai-chat-messages ${
-                messages.length === 0
-                  ? "is-empty"
-                  : ""
-              }`}
+            <ChatTranscript
+              key={activeChatId || "new"}
+              label="Conversación con SEAL IA"
+              revision={`${messages.length}:${generating}`}
+              followKey={messages.findLast(message => message.role === "user")?.id || ""}
+              className={`ai-chat-messages ${messages.length === 0 && !generating ? "is-empty" : ""}`}
             >
               {messages.length ===
               0 ? (
                 <div className="ai-chat-welcome">
-                  <div className="ai-chat-welcome__logo">
-                    S
-                  </div>
+                  <BrandLogo size="large" alt="SEAL" />
 
                   <h1>
                     ¿Qué plantilla
@@ -885,37 +873,9 @@ export default function PlantillasIaPage() {
                 </div>
               ) : (
                 <>
-                  {messages.map(
-                    (message) => (
-                      <div
-                        key={
-                          message.id
-                        }
-                        className={`ai-chat-message ai-chat-message--${message.role}`}
-                      >
-                        <div className="ai-chat-message__avatar">
-                          {message.role ===
-                          "user"
-                            ? "Tú"
-                            : "IA"}
-                        </div>
-
-                        <div className="ai-chat-message__body">
-                          <div>
-                            {
-                              message.text
-                            }
-                          </div>
-
-                          <small>
-                            {formatDate(
-                              message.created_at
-                            )}
-                          </small>
-                        </div>
-                      </div>
-                    )
-                  )}
+                  {messages.map(message => message.role === "user"
+                    ? <ChatQuestion key={message.id} text={message.text} />
+                    : <ChatAnswer key={message.id} text={message.text} />)}
 
                   {templateHtml && (
                     <div className="ai-chat-viewer-card">
@@ -949,15 +909,14 @@ export default function PlantillasIaPage() {
                   )}
                 </>
               )}
-            </section>
+              {generating && <ChatThinking label="Preparando una respuesta…" />}
+            </ChatTranscript>
 
-            <form
-              className="ai-chat-composer"
-              onSubmit={sendPrompt}
-            >
+            <div className="ai-chat-composer">
               <div className="ai-chat-composer__context">
                 <select
                   className="control"
+                  disabled={generating || loading || publishing}
                   value={
                     selectedContractId
                   }
@@ -1002,34 +961,8 @@ export default function PlantillasIaPage() {
                 )}
               </div>
 
-              <div className="ai-chat-composer__input">
-                <input
-                  value={prompt}
-                  onChange={(e) =>
-                    setPrompt(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Mensaje a Seal IA..."
-                  disabled={
-                    generating
-                  }
-                />
-
-                <button
-                  type="submit"
-                  disabled={
-                    generating ||
-                    !prompt.trim()
-                  }
-                  aria-label="Enviar mensaje"
-                >
-                  {generating
-                    ? "..."
-                    : "↑"}
-                </button>
-              </div>
-            </form>
+              <ChatComposer value={prompt} onChange={setPrompt} onSubmit={sendPrompt} busy={generating} disabled={loading || publishing} maxLength={4000} placeholder="Describe tu plantilla o pide un cambio…" />
+            </div>
           </>
         ) : (
           <section className="ai-doc-viewer">
@@ -1071,14 +1004,10 @@ export default function PlantillasIaPage() {
             </div>
 
             <div className="ai-doc-viewer__content">
-              <article
-                className="ai-doc-viewer__paper"
-                dangerouslySetInnerHTML={{
-                  __html:
-                    reviewHtml ||
-                    "<p>La plantilla aparecerá aquí.</p>",
-                }}
-              />
+              <TemplateEditor value={reviewHtml} onChange={setReviewHtml} disabled={publishing} groups={catalog ? [
+                { label: "Cliente", items: catalog.employee.map((item) => [item.key, item.label]) },
+                { label: "Contrato", items: catalog.company.map((item) => [item.key, item.label]) },
+              ] : []} />
 
               <aside className="ai-doc-review">
                 <div>
@@ -1091,10 +1020,7 @@ export default function PlantillasIaPage() {
                   </h2>
 
                   <p>
-                    Si necesitas cambios
-                    de contenido, vuelve
-                    al chat y pídeselos a
-                    la IA.
+                    Edita el documento, revisa sus campos y registra los cambios antes de publicar.
                   </p>
                 </div>
 
@@ -1171,25 +1097,6 @@ export default function PlantillasIaPage() {
                     />
                   </label>
                 </div>
-
-                <label className="field">
-                  <span className="field__label">
-                    HTML revisado
-                  </span>
-
-                  <textarea
-                    className="control ai-doc-review__html"
-                    value={
-                      reviewHtml
-                    }
-                    onChange={(e) =>
-                      setReviewHtml(
-                        e.target.value
-                      )
-                    }
-                    placeholder="Puedes hacer un ajuste manual mínimo si lo necesitas."
-                  />
-                </label>
 
                 <label className="field">
                   <span className="field__label">

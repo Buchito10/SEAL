@@ -2812,7 +2812,7 @@ button.tile{
 }
 
 /* Dashboard reference skin: matches the attached light executive layout while keeping data dynamic. */
-.app:has(.dashboard-reference){
+:where(.app:has(.dashboard-reference)){
   --dash-bg:#f4f3ef;
   --dash-surface:#ffffff;
   --dash-border:#e6e3dc;
@@ -2837,7 +2837,7 @@ button.tile{
   color:var(--dash-t1);
 }
 
-.app:has(.dashboard-reference) .sidebar{
+:where(.app:has(.dashboard-reference)) .sidebar{
   top:0;
   width:220px;
   height:100vh;
@@ -2850,7 +2850,7 @@ button.tile{
   box-shadow:none;
 }
 
-.app:has(.dashboard-reference) .brand--link{
+:where(.app:has(.dashboard-reference)) .brand--link{
   min-height:81px;
   margin:0;
   padding:24px 18px 20px;
@@ -2860,12 +2860,12 @@ button.tile{
   background:transparent;
 }
 
-.app:has(.dashboard-reference) .brand--link:hover{
+:where(.app:has(.dashboard-reference)) .brand--link:hover{
   transform:none;
   background:transparent;
 }
 
-.app:has(.dashboard-reference) .brand__logo{
+:where(.app:has(.dashboard-reference)) .brand__logo{
   width:36px;
   height:36px;
   border-radius:10px;
@@ -2876,24 +2876,24 @@ button.tile{
   font-size:18px;
 }
 
-.app:has(.dashboard-reference) .brand__name{
+:where(.app:has(.dashboard-reference)) .brand__name{
   color:var(--dash-t1);
   font-size:14px;
   font-weight:600;
 }
 
-.app:has(.dashboard-reference) .brand__sub{
+:where(.app:has(.dashboard-reference)) .brand__sub{
   color:var(--dash-t3);
   font-size:10px;
 }
 
-.app:has(.dashboard-reference) .nav{
+:where(.app:has(.dashboard-reference)) .nav{
   flex:1;
   gap:1px;
   padding:12px 10px;
 }
 
-.app:has(.dashboard-reference) .nav:before{
+:where(.app:has(.dashboard-reference)) .nav:before{
   content:"Menú";
   padding:4px 12px 8px;
   color:var(--dash-t3);
@@ -2903,7 +2903,7 @@ button.tile{
   text-transform:uppercase;
 }
 
-.app:has(.dashboard-reference) .nav__item{
+:where(.app:has(.dashboard-reference)) .nav__item{
   min-height:34px;
   gap:10px;
   padding:9px 12px;
@@ -2915,17 +2915,17 @@ button.tile{
   font-weight:500;
 }
 
-.app:has(.dashboard-reference) .nav__item:hover{
+:where(.app:has(.dashboard-reference)) .nav__item:hover{
   background:var(--dash-bg);
   color:var(--dash-t1);
 }
 
-.app:has(.dashboard-reference) .nav__item.is-active{
+:where(.app:has(.dashboard-reference)) .nav__item.is-active{
   background:var(--dash-t1);
   color:#fff;
 }
 
-.app:has(.dashboard-reference) .nav__dot{
+:where(.app:has(.dashboard-reference)) .nav__dot{
   width:15px;
   height:15px;
   margin:0;
@@ -2935,18 +2935,18 @@ button.tile{
   opacity:.78;
 }
 
-.app:has(.dashboard-reference) .nav__item.is-active .nav__dot{
+:where(.app:has(.dashboard-reference)) .nav__item.is-active .nav__dot{
   background:transparent;
   box-shadow:inset 0 0 0 1.5px currentColor;
 }
 
-.app:has(.dashboard-reference) .sidebar__bottom{
+:where(.app:has(.dashboard-reference)) .sidebar__bottom{
   display:flex;
   gap:0;
   margin-top:0;
 }
 
-.app:has(.dashboard-reference) .mini-card{
+:where(.app:has(.dashboard-reference)) .mini-card{
   margin:0;
   padding:12px 14px;
   border:0;
@@ -2955,7 +2955,7 @@ button.tile{
   background:transparent;
 }
 
-.app:has(.dashboard-reference) .mini-card__title{
+:where(.app:has(.dashboard-reference)) .mini-card__title{
   color:var(--dash-t3);
   font-size:9px;
   font-weight:600;
@@ -2963,12 +2963,12 @@ button.tile{
   text-transform:uppercase;
 }
 
-.app:has(.dashboard-reference) .mini-card__text{
+:where(.app:has(.dashboard-reference)) .mini-card__text{
   color:var(--dash-t2);
   font-size:11px;
 }
 
-.app:has(.dashboard-reference) .mini-card .btn{
+:where(.app:has(.dashboard-reference)) .mini-card .btn{
   min-height:31px;
   border:1px solid var(--dash-border);
   border-radius:7px;
@@ -2978,7 +2978,7 @@ button.tile{
   font-size:11px;
 }
 
-.app:has(.dashboard-reference) .user{
+:where(.app:has(.dashboard-reference)) .user{
   grid-template-columns:32px minmax(0, 1fr) 28px;
   gap:10px;
   margin:0;
@@ -2989,7 +2989,7 @@ button.tile{
   background:transparent;
 }
 
-.app:has(.dashboard-reference) .user__avatar{
+:where(.app:has(.dashboard-reference)) .user__avatar{
   width:32px;
   height:32px;
   border:1px solid var(--dash-accent);
@@ -2999,18 +2999,18 @@ button.tile{
   font-size:11px;
 }
 
-.app:has(.dashboard-reference) .user__name{
+:where(.app:has(.dashboard-reference)) .user__name{
   color:var(--dash-t1);
   font-size:12px;
   font-weight:600;
 }
 
-.app:has(.dashboard-reference) .user__role{
+:where(.app:has(.dashboard-reference)) .user__role{
   color:var(--dash-t3);
   font-size:10px;
 }
 
-.app:has(.dashboard-reference) .user .icon-btn{
+:where(.app:has(.dashboard-reference)) .user .icon-btn{
   min-width:28px;
   min-height:28px;
   border:0;
@@ -3019,12 +3019,12 @@ button.tile{
   box-shadow:none;
 }
 
-.app:has(.dashboard-reference) .main{
+:where(.app:has(.dashboard-reference)) .main{
   gap:0;
   background:var(--dash-bg);
 }
 
-.app:has(.dashboard-reference) .page{
+:where(.app:has(.dashboard-reference)) .page{
   max-width:none;
   height:100vh;
   margin:0;
@@ -3583,7 +3583,8 @@ button.tile{
   overflow:auto;
   display:grid;
   grid-template-columns:repeat(3, minmax(0, 1fr));
-  grid-auto-rows:minmax(150px, 1fr);
+  grid-auto-rows:max-content;
+  align-content:start;
   gap:10px;
   padding-right:4px;
 }
@@ -3591,9 +3592,13 @@ button.tile{
 .template-tile{
   display:flex;
   flex-direction:column;
-  min-height:0;
+  min-height:230px;
   padding:12px;
   overflow:hidden;
+}
+
+.template-tile > *{
+  flex-shrink:0;
 }
 
 .template-tile .tile__top{
@@ -3601,17 +3606,13 @@ button.tile{
 }
 
 .template-tile .strong{
-  overflow:hidden;
-  display:-webkit-box;
-  -webkit-line-clamp:2;
-  -webkit-box-orient:vertical;
+  overflow-wrap:anywhere;
   line-height:1.25;
 }
 
 .template-tile .muted{
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+  overflow-wrap:anywhere;
+  white-space:normal;
 }
 
 .template-tile__meta{
@@ -7848,7 +7849,7 @@ body:has(.ai-chat-shell){
 }
 
 /* Login público: mismo lenguaje editorial del dashboard, manteniendo el flujo intacto. */
-.login--auth:not(.reset-access):not(.signature-mobile){
+.login--auth{
   --bg:#f4f3ef;
   --surface:#ffffff;
   --surface2:#fbfaf7;
@@ -7870,25 +7871,25 @@ body:has(.ai-chat-shell){
   color:var(--text);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__wrap--auth{
+.login--auth .login__wrap--auth{
   max-width:1040px;
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login-shell{
+.login--auth .login-shell{
   min-height:620px;
   border:1px solid var(--stroke2);
   background:var(--surface);
   box-shadow:0 24px 70px rgba(24,23,20,.10);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__aside{
+.login--auth .login__aside{
   border-right:1px solid var(--stroke2);
   background:
     radial-gradient(circle at 14% 12%, rgba(196,151,62,.14), transparent 30%),
     linear-gradient(180deg, #ffffff, #fbfaf7);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__aside:before{
+.login--auth .login__aside:before{
   border-color:rgba(196,151,62,.16);
   box-shadow:
     58px 42px 0 -1px rgba(196,151,62,.07),
@@ -7896,109 +7897,109 @@ body:has(.ai-chat-shell){
     174px 126px 0 -1px rgba(196,151,62,.03);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__aside:after{
+.login--auth .login__aside:after{
   opacity:.36;
   background:
     linear-gradient(120deg, transparent 0 38%, rgba(196,151,62,.08) 39%, transparent 40% 100%),
     linear-gradient(90deg, rgba(24,23,20,.035) 1px, transparent 1px);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__logo{
+.login--auth .login__logo{
   color:var(--gold);
   background:var(--text);
   box-shadow:none;
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__brandName,
-.login--auth:not(.reset-access):not(.signature-mobile) .login__heroTitle,
-.login--auth:not(.reset-access):not(.signature-mobile) .login__title{
+.login--auth .login__brandName,
+.login--auth .login__heroTitle,
+.login--auth .login__title{
   color:var(--text);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__heroTitle,
-.login--auth:not(.reset-access):not(.signature-mobile) .login__title{
+.login--auth .login__heroTitle,
+.login--auth .login__title{
   font-family:Georgia, "Times New Roman", serif;
   font-weight:400;
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__heroTitle{
+.login--auth .login__heroTitle{
   font-size:40px;
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__brandSub,
-.login--auth:not(.reset-access):not(.signature-mobile) .login__heroText,
-.login--auth:not(.reset-access):not(.signature-mobile) .login__subtitle,
-.login--auth:not(.reset-access):not(.signature-mobile) .field__label,
-.login--auth:not(.reset-access):not(.signature-mobile) .login__hint .muted{
+.login--auth .login__brandSub,
+.login--auth .login__heroText,
+.login--auth .login__subtitle,
+.login--auth .field__label,
+.login--auth .login__hint .muted{
   color:var(--muted);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__securityList span{
+.login--auth .login__securityList span{
   border-color:var(--stroke2);
   background:#fffaf0;
   color:var(--muted);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__document{
+.login--auth .login__document{
   border-color:var(--stroke2);
   background:var(--surface);
   box-shadow:0 18px 38px rgba(24,23,20,.08);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__document span{
+.login--auth .login__document span{
   background:#e6e3dc;
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__document span:nth-child(3){
+.login--auth .login__document span:nth-child(3){
   background:rgba(196,151,62,.42);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__sealMark{
+.login--auth .login__sealMark{
   border-color:rgba(196,151,62,.34);
   background:#fffaf0;
   color:var(--goldDeep);
   box-shadow:0 14px 30px rgba(24,23,20,.10), 0 0 0 7px rgba(196,151,62,.10);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__card--form{
+.login--auth .login__card--form{
   background:#ffffff;
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__card--form .control--lg{
+.login--auth .login__card--form .control--lg{
   border-color:var(--stroke2);
   background:#ffffff;
   color:var(--text);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__card--form .control--lg::placeholder{
+.login--auth .login__card--form .control--lg::placeholder{
   color:var(--muted2);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login__hint{
+.login--auth .login__hint{
   border-color:var(--stroke2);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login-reset-overlay{
+.login--auth .login-reset-overlay{
   background:rgba(24,23,20,.38);
   backdrop-filter:blur(8px);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login-reset-modal{
+.login--auth .login-reset-modal{
   border-color:var(--stroke2);
   background:#ffffff;
   box-shadow:0 24px 70px rgba(24,23,20,.16);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login-reset-modal__copy{
+.login--auth .login-reset-modal__copy{
   color:var(--muted);
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login-reset-modal__success{
+.login--auth .login-reset-modal__success{
   border-color:rgba(58,148,104,.24);
   background:#ebf6f1;
 }
 
-.login--auth:not(.reset-access):not(.signature-mobile) .login-reset-modal .icon-btn{
+.login--auth .login-reset-modal .icon-btn{
   border-color:var(--stroke2);
   background:#ffffff;
   color:var(--text);

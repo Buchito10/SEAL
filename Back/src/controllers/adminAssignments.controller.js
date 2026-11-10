@@ -232,10 +232,15 @@ async function approve(req, res) {
 
         // notificar al cliente
         if (updated.client_email) {
-            await emailService.sendApprovedNotificationEmail({
-                to: updated.client_email,
-                name: updated.client_name || "",
-            });
+            try {
+                await emailService.sendApprovedNotificationEmail({
+                    to: updated.client_email,
+                    name: updated.client_name || "",
+                });
+            } catch (error) {
+                // The PDF and approval are already committed; mail is a notification.
+                console.error("No se pudo notificar la aprobación:", error.message);
+            }
         }
 
         return ok(res, updated);

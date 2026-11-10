@@ -70,3 +70,10 @@ backups/
 
 # Paquete fuente usado solamente para integrar la portada
 /landing.zip
+
+# Local event build and TypeScript cache
+**/.next-event/
+**/*.tsbuildinfo
+
+# Local network address recorded by the event launcher
+/evento-ip.txt

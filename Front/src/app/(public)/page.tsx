@@ -1,3 +1,5 @@
+import BrandLogo from "@/components/BrandLogo";
+import ProductPreview from "@/components/ProductPreview";
 import Image from "next/image";
 import Link from "next/link";
 import styles from "./landing.module.css";
@@ -38,7 +40,7 @@ export default function LandingPage() {
       <header className={styles.header}>
         <div className={styles.navbar}>
           <a className={styles.brand} href="#inicio" aria-label="Ir al inicio de SEAL">
-            <span className={styles.brandMark}>S</span>
+            <BrandLogo size="small" />
             <span>
               <strong>SEAL</strong>
               <small>Contratos inteligentes</small>
@@ -98,55 +100,7 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className={styles.productPreview} aria-label="Ejemplo visual del panel SEAL">
-          <div className={styles.browserBar}>
-            <span className={styles.browserDots} aria-hidden="true"><i /><i /><i /></span>
-            <span className={styles.address}>app.seal.mx</span>
-          </div>
-          <div className={styles.previewBody}>
-            <aside className={styles.previewSidebar}>
-              <b><span>S</span> SEAL</b>
-              <div className={styles.activePreviewItem}>Expedientes</div>
-              <div>Plantillas</div>
-              <div>Clientes</div>
-              <div>Bitácora</div>
-            </aside>
-            <div className={styles.previewMain}>
-              <div className={styles.previewHeading}>
-                <div>
-                  <small>EXPEDIENTE ACTIVO</small>
-                  <strong>Ana Torres Demo</strong>
-                </div>
-                <span>EN REVISIÓN</span>
-              </div>
-              <div className={styles.contractCard}>
-                <div className={styles.documentIcon}>§</div>
-                <div>
-                  <strong>Contrato laboral indefinido</strong>
-                  <p>Desarrollador Frontend · Tecnología</p>
-                </div>
-                <button type="button" tabIndex={-1}>Ver detalle</button>
-              </div>
-              <div className={styles.previewGrid}>
-                <article>
-                  <small>ESTADO</small>
-                  <strong>Documento revisado</strong>
-                  <p>Listo para continuar con el proceso.</p>
-                </article>
-                <article>
-                  <small>ACTIVIDAD</small>
-                  <strong>4 eventos registrados</strong>
-                  <p>Historial disponible en la bitácora.</p>
-                </article>
-              </div>
-              <div className={styles.previewPeople}>
-                <span>También en preparación</span>
-                <b>Desarrollador Backend</b>
-                <b>QA Tester</b>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProductPreview />
       </section>
 
       <section className={styles.solution} id="solucion">
@@ -254,7 +208,7 @@ export default function LandingPage() {
 
       <footer className={styles.footer}>
         <div className={styles.brand}>
-          <span className={styles.brandMark}>S</span>
+          <BrandLogo size="small" />
           <span><strong>SEAL</strong><small>Contratos inteligentes</small></span>
         </div>
         <p>Proyecto académico de Ingeniería en Desarrollo y Gestión de Software · UTSJR</p>

@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SEAL · frontend
 
-## Getting Started
+Aplicación Next.js para administrar plantillas, contratos y clientes, y consultar documentos con IA. El backend Express se encuentra en `../Back`.
 
-First, run the development server:
+## Desarrollo
 
 ```bash
+npm ci
+cp .env.local.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La aplicación abre en `http://localhost:3000`. Las llamadas a `/api` se reenvían a `API_PROXY_TARGET` (por defecto `http://127.0.0.1:3001`). Inicia el backend por separado con sus variables y servicios configurados. No compartas credenciales de producción para pruebas.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Para acceder desde un teléfono en la misma red, usa la IP local del equipo que ejecuta Next. El navegador sigue usando `/api` en el mismo origen; no necesita contactar un `localhost:3001` propio del teléfono.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Verificación
 
-## Learn More
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+npm --prefix ../Back test
+npm --prefix ../qa run test:ui
+```
 
-To learn more about Next.js, take a look at the following resources:
+La suite de interfaz requiere el frontend en ejecución. Usa datos ficticios y respuestas simuladas para revisar navegación, consultas y edición. Si usas otro puerto, indica `BASE_URL=http://127.0.0.1:3002` antes del comando. La suite `test:e2e` existente comprueba integración con un entorno configurado y se ejecuta por separado.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+El backend requiere Node.js 22.12 o superior. `npm --prefix ../Back run test:pdf` genera un documento ficticio con Chromium y comprueba el archivo y su huella SHA-256. Requiere el navegador descargado por Puppeteer o `PUPPETEER_EXECUTABLE_PATH` apuntando a Chromium/Chrome.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Componentes compartidos
 
-## Deploy on Vercel
+- `Sidebar`: menú de escritorio y móvil, con diálogo nativo y navegación por teclado.
+- `AssistantDock` y `ContractAssistant`: consulta explícita de un expediente desde administración y el portal de cliente.
+- `Chat`: entrada multilínea, presentación segura de texto, estados de espera y fragmentos del documento.
+- `TemplateEditor`: edición de documentos, formato, campos y vista HTML. Usa DOMPurify en el navegador; el servidor requiere su propia validación de entradas.
+- `Modal`: ventanas nativas de plantillas con foco contenido, cierre con Escape y respeto por los cambios pendientes.
+- `ProductPreview`: recorrido ilustrativo de la portada, claramente identificado como datos ficticios.
+- `src/app/professional.css`: estilos compartidos de esta mejora. Los estilos históricos permanecen en `globals.css` para conservar el resto de las pantallas.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Producción
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`npm run build` produce la salida `standalone` usada por el Dockerfile. `npm start` copia los recursos estáticos e inicia ese servidor; admite `PORT` y `HOSTNAME`. El despliegue existente utiliza Nginx para `/api`, HTTPS y servicios separados. Consulta `../docs/despliegue-nextjs-nginx-https.md`, `../docs/release/DIRECTIVA_LIBERACION_SEAL.md` y `../docs/SEAL_EVENTO_9_SEPTIEMBRE.md` antes de liberar una versión.

@@ -1,8 +1,9 @@
 "use client";
 
+import ContractAssistant from "@/components/ContractAssistant";
+
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
-  askAdminAssignmentAi,
   approveAdminAssignment,
   createAssignment,
   getAdminAssignment,
@@ -155,10 +156,7 @@ export default function ContratosPage() {
   const [notice, setNotice] = useState("");
 
   const [composer, setComposer] = useState("");
-  const [aiQuestion, setAiQuestion] = useState("Resume los puntos importantes de este contrato.");
-  const [aiAnswer, setAiAnswer] = useState("");
   const [sending, setSending] = useState(false);
-  const [askingAi, setAskingAi] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -177,7 +175,7 @@ export default function ContratosPage() {
     try {
       const [assignment, rows] = await Promise.all([getAdminAssignment(id), listAssignmentMessages(id)]);
       selectedIdRef.current = id;
-      setAiAnswer("");
+
       setSelected(assignment);
       setMessages(rows);
       setSelectedId(id);
@@ -486,22 +484,6 @@ export default function ContratosPage() {
     }
   }
 
-  async function onAskAi(e: FormEvent) {
-    e.preventDefault();
-    if (!selected || !aiQuestion.trim()) return;
-
-    setAskingAi(true);
-    setError("");
-
-    try {
-      const data = await askAdminAssignmentAi(selected.id, aiQuestion.trim());
-      setAiAnswer(data.answer);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setAskingAi(false);
-    }
-  }
 
   return (
     <>
@@ -694,7 +676,7 @@ export default function ContratosPage() {
                     type="button"
                     onClick={() => setActiveTab(tab)}
                   >
-                    {tab[0].toUpperCase() + tab.slice(1)}
+                    {tab === "ia" ? "IA" : tab[0].toUpperCase() + tab.slice(1)}
                   </button>
                 ))}
               </div>
@@ -872,33 +854,7 @@ export default function ContratosPage() {
                   </div>
                 </div>
               ) : activeTab === "ia" ? (
-                <div className="detail-stack">
-                  <div className="note">
-                    <div className="note__title">Asistente IA administrativo</div>
-                    <div className="note__text">
-                      Úsalo para resumir el contrato, ubicar cláusulas o revisar qué debe confirmar el cliente antes de firmar.
-                    </div>
-                  </div>
-
-                  <form className="form-grid" onSubmit={onAskAi}>
-                    <textarea
-                      className="control"
-                      rows={4}
-                      value={aiQuestion}
-                      onChange={(e) => setAiQuestion(e.target.value)}
-                      placeholder="Pregunta sobre este expediente..."
-                    />
-                    <button className="btn btn--primary" type="submit" disabled={askingAi || !aiQuestion.trim()}>
-                      {askingAi ? "Pensando..." : "Preguntar"}
-                    </button>
-                  </form>
-
-                  {aiAnswer && (
-                    <div className="chat__bubble" style={{ whiteSpace: "pre-wrap" }}>
-                      {aiAnswer}
-                    </div>
-                  )}
-                </div>
+                <ContractAssistant key={selected.id} assignmentId={selected.id} role="ADMIN" title={selected.contract_title || "Contrato"} />
               ) : (
                 <div className="log">
                   {(selected.events || []).length === 0 ? (

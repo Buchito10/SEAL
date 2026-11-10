@@ -1,5 +1,6 @@
 "use client";
 
+import BrandLogo from "@/components/BrandLogo";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -131,7 +132,7 @@ export default function PasswordAccessForm({ expectedPurpose }: PasswordAccessFo
         <div className="login__card reset-access__card">
           <div className="login__header">
             <div className="login__brand">
-              <div className="login__logo">S</div>
+              <BrandLogo />
               <div>
                 <div className="login__brandName">Seal</div>
                 <div className="login__brandSub">

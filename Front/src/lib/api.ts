@@ -1,6 +1,6 @@
 import { logout, type SessionUser } from "./auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 type ApiEnvelope<T> = {
   ok: boolean;
@@ -402,6 +402,7 @@ async function readPayload<T>(res: Response): Promise<ApiEnvelope<T> | null> {
 function localizeApiMessage(message: string) {
   const translations: Record<string, string> = {
     "Invalid credentials": "Credenciales inválidas",
+    "Internal server error": "El servicio no pudo completar la solicitud. Intenta de nuevo en unos segundos.",
     "User disabled": "Usuario deshabilitado",
     "Invalid body": "Los datos enviados no son válidos",
     "Not found": "No se encontró el recurso solicitado",
@@ -439,7 +440,13 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}) {
     if (res.status === 401) logout();
 
     throw new ApiError(
-      localizeApiMessage(payload?.message || payload?.error || `Error ${res.status}`),
+      localizeApiMessage(payload?.message || payload?.error || (
+        res.status >= 500
+          ? "No se pudo comunicar con el servicio. Intenta de nuevo en unos segundos."
+          : res.status === 429
+            ? "Demasiados intentos. Espera un minuto antes de intentar de nuevo."
+            : `Error ${res.status}`
+      )),
       res.status,
       payload?.details
     );

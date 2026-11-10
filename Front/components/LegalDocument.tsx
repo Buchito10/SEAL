@@ -1,3 +1,4 @@
+import BrandLogo from "@/components/BrandLogo";
 import Link from "next/link";
 import type { LegalSection } from "@/lib/privacyContent";
 
@@ -20,7 +21,7 @@ export default function LegalDocument({
     <main className="legal-page">
       <header className="legal-topbar">
         <Link className="legal-brand" href="/login" aria-label="Ir al inicio de sesión de Seal">
-          <span className="legal-brand__mark">S</span>
+          <BrandLogo size="small" />
           <span>
             <strong>Seal</strong>
             <small>Contratos y firma digital</small>

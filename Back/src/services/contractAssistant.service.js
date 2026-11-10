@@ -418,6 +418,7 @@ async function askOpenRouter({
             "https://openrouter.ai/api/v1/chat/completions",
             {
                 method: "POST",
+                signal: AbortSignal.timeout(45000),
 
                 headers: {
                     Authorization:

@@ -1,5 +1,6 @@
 "use client";
 
+import BrandLogo from "@/components/BrandLogo";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { login, requestPasswordReset } from "@/lib/api";
@@ -82,7 +83,7 @@ export default function LoginPage() {
         <div className="login-shell">
           <aside className="login__aside" aria-label="Seguridad de Seal">
             <div className="login__brand login__brand--aside">
-              <div className="login__logo">S</div>
+              <BrandLogo />
               <div>
                 <div className="login__brandName">Seal</div>
                 <div className="login__brandSub">Contratos y firma digital</div>
@@ -108,11 +109,11 @@ export default function LoginPage() {
                 <span />
                 <span />
               </div>
-              <div className="login__sealMark">S</div>
+              <div className="login__sealMark"><BrandLogo size="small" /></div>
             </div>
 
             <div className="login__securityList" aria-label="Características de seguridad">
-              <span>Cifrado de sesión</span>
+              <span>Sesión protegida</span>
               <span>Roles autorizados</span>
               <span>Bitácora auditable</span>
               <span>Firma con evidencia</span>
@@ -122,7 +123,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="login__card login__card--form">
             <div className="login__header">
               <div className="login__brand login__brand--compact">
-                <div className="login__logo">S</div>
+                <BrandLogo />
                 <div>
                   <div className="login__brandName">Seal</div>
                   <div className="login__brandSub">Acceso a la plataforma</div>

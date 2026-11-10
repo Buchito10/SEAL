@@ -9,7 +9,7 @@ const PDF_RENDERER_VERSION = "seal-pdf-v2";
 async function htmlToPdfBuffer({ html, format = "A4" }) {
     let puppeteer;
     try {
-        puppeteer = require("puppeteer");
+        puppeteer = (await import("puppeteer")).default;
     } catch (e) {
         const err = new Error("PDF engine not installed (missing puppeteer)");
         err.code = 500;
@@ -23,15 +23,19 @@ async function htmlToPdfBuffer({ html, format = "A4" }) {
 
     try {
         const page = await browser.newPage();
+        // Contract documents do not need scripts to render or print.
+        await page.setJavaScriptEnabled(false);
         await page.setContent(html, { waitUntil: "networkidle0" });
         await page.emulateMediaType("print");
-        const buf = await page.pdf({
+        const pdfBytes = await page.pdf({
             format,
             printBackground: true,
             preferCSSPageSize: true,
             margin: { top: "0", right: "0", bottom: "0", left: "0" },
         });
-        return { buffer: buf, hash: sha256Hex(buf) };
+        // Puppeteer returns Uint8Array. Hash and store the actual PDF bytes.
+        const buffer = Buffer.from(pdfBytes);
+        return { buffer, hash: sha256Hex(buffer) };
     } finally {
         await browser.close();
     }
